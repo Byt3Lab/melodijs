@@ -38,336 +38,111 @@ Le store global (`this.$store`) est aussi réactif : toute interpolation ou exp
 
 ```js
 const app = createApp({
-  components: {
-    'my-counter': {
-      template: `<div><button @click="inc">+</button> <span>{{ count }}</span></div>`,
-      data() { return { count: 0 } },
-      methods: { inc() { this.count++ } }
-    }
-  }
-})
-```
+  # MelodiJS — résumé, structure et guide rapide
 
-## Migration
+  Ce dépôt contient MelodiJS, une petite bibliothèque JavaScript réactive inspirée par Vue et Solid.
 
-Vos anciens composants sont compatibles, mais bénéficient désormais de la réactivité fine-grain automatiquement.
-# MelodiJS — Petite librairie réactive (guide complet pour débutants)
+  Objectif : fournir des composants HTML réactifs légers sans Virtual DOM. La réactivité est implémentée par un moteur de signaux (fine-grained) situé dans `melodijs.js`.
 
-> Version minimale d'un micro-framework réactif inspiré par Vue/React.
+  Ce README met à jour et synthétise les informations principales : fonctionnalités, structure du projet, logique interne, et instructions pour démarrer et tester.
 
-Ce document explique comment utiliser MelodiJS, écrire des composants, travailler avec les directives (v-if, v-for, v-show...), les slots, la communication parent-enfant ($emit / $on), et la store globale. Le guide est en français et vise les débutants.
+  ## Points clés / fonctionnalités
 
-## Table des matières
-- Présentation rapide
-- Installation / essai local
-- Concepts clés
-  - createApp & mount
-  - composants (template, data, methods, props)
-  - cycle de vie (hooks)
-  - réactivité (Proxy)
-  - store global
-- Templates et sources
-- Directives supportées
-  - interpolation `{{ ... }}` (expressions JS)
-  - `v-if`, `v-else-if`, `v-else`
-  - `v-show`
-  - `v-for`
-  - `v-pre`
-  - `v-model`
-  - Event shorthand `@event`
-- Slots (default & named) et réactivité des slots
-- Événements parent-enfant : `$emit` / `$on`
-- Examples pratiques
-- Bonnes pratiques & limitations
-- Débogage et FAQ
-- Prochaines améliorations possibles
+  - Réactivité fine-grain basée sur des « signaux » (MelodiReactive) : chaque propriété d'état est un signal (getter/setter) qui notifie des effets.
+  - API familière type Vue : `createApp`, `components`, `data()`, `methods`, `props`, `hooks`, `computed`.
+  - Directives supportées : interpolation `{{ ... }}`, `v-if`, `v-else-if`, `v-else`, `v-show`, `v-for`, `v-model`, `v-pre`, `:attr` / `v-bind:` et `@event` (raccourci de `v-on`).
+  - Slots (nommés et par défaut) : contenu light DOM distribué dans le template via `<slot>`.
+  - Store global réactif accessible via `this.$store`.
+  - Événements personnalisés : `this.$emit(name, payload)` et `this.$on(name, handler)` (bubbling vers ancêtres).
+  - Support minimal pour templates externes : `{ el: '#tpl' }` et `{ url: '/path' }` (fetch).
 
----
+  ## Structure du projet (fichiers importants)
 
-## Présentation rapide
+  - `melodijs.js` — runtime principal (exporte `createApp`). Contient :
+    - `MelodiReactive` : primitives signaux/effets/memo.
+    - `MelodiJS` : instance d'application (gestion des composants, store, montage).
+    - `Component` : logique de compilation / rendu des templates, directives, binding, slots, effets et cleanup.
+  - `index.html`, `test_*.html`, `docs/` — exemples et documentation HTML.
+  - `tests/run-tests.js` — harness jsdom pour vérifier `v-if`, `v-show`, `v-model`, props et store partagé.
+  - `package.json` — script `test` (node tests/run-tests.js) et `devDependencies` (jsdom).
 
-MelodiJS est une petite bibliothèque JavaScript minimale pour construire des composants HTML dynamiques sans build tools. Elle fournit :
+  ## Logique principale (en bref)
 
-- Un moyen simple de déclarer des composants (template + data + methods).
-- Une réactivité basique via `Proxy` : quand vous changez `this.someProp`, le composant se re-render.
-- Directives structurales (`v-if`, `v-for`, `v-show`) et interpolation `{{ ... }}` qui évaluent des expressions JavaScript.
-- Slots (content projection), props, et un store global simple accessible via `this.$store`.
-- Un API évènementielle `$emit` / `$on` pour la communication enfant → parent (bubbling vers les ancêtres).
+  - Réactivité : chaque propriété d'un état est encapsulée par `createSignal(value)` qui expose un getter et un setter. Les getters enregistrent l'effet courant (`_currentEffect`) et les setters notifient les subscribers.
+  - Effets : `createEffect(fn)` exécute `fn` et enregistre les dépendances (via getters appelés dans `fn`). Les effets sont utilisés pour synchroniser le DOM (text nodes, attributs, styles, etc.).
+  - Rendering : le composant compile son template (ou utilise le contenu initial de l'élément), traite les directives et construit un fragment DOM. Les interpolations textuelles et les bindings installent des effets pour mettre à jour les nodes.
+  - v-for : support basique avec option `:key` pour essayer de réutiliser / diff-er les éléments. Sans clé, le comportement recrée les éléments.
+  - Slots : le contenu light DOM est stocké dans `_slotSource` et cloné dans le template au moment du rendu.
+  - Events : `this.$emit` appelle handlers locaux puis remonte dans la chaîne DOM et une chaîne logique `_parent` pour permettre le bubbling.
 
-Le runtime principal se trouve dans `melodijs.js` et n'a pas de dépendances extérieures.
+  ## Quick start (développement & usage)
 
-## Installation / essai local
+  Prérequis : Node.js (pour les tests), navigateur moderne pour l'exemple HTML.
 
-1. Ouvrez le dossier du projet dans votre serveur static local. Par exemple, depuis la racine du projet :
+  1) Ouvrir localement (serveur statique) :
 
-```bash
-python3 -m http.server 8000
-# puis ouvrez http://localhost:8000/index.html
-```
+  ```bash
+  # depuis la racine du projet
+  python3 -m http.server 8000
+  # puis ouvrir http://localhost:8000/index.html
+  ```
 
-2. Le fichier `index.html` de démonstration montre plusieurs composants et cas d'usage.
+  2) Inclure et utiliser (extrait minimal) :
 
-## Concepts clés
+  ```html
+  <script type="module">
+    import { createApp } from './melodijs.js'
 
-### createApp & mount
+    const app = createApp({
+      components: {
+        'my-counter': {
+          template: `<div><button @click="dec">-</button> {{ count }} <button @click="inc">+</button></div>`,
+          data(){ return { count: 0 } },
+          methods: { inc(){ this.count++ }, dec(){ this.count-- } }
+        }
+      }
+    })
 
-La librairie expose `createApp(options)`.
+    app.mount('#app')
+  </script>
+  ```
 
-options possibles :
+  3) Tests (local, Node.js) :
 
-- `store` : objet initial pour le store global (reactif)
-- `components` : map nom -> définition du composant
+  ```bash
+  npm install
+  npm test
+  ```
 
-Exemple :
+  Les tests utilisent `jsdom` (déjà listé en devDependencies) et valident des cas comme `v-if`, `v-show`, `v-model`, props et le store partagé.
 
-```js
-import { createApp } from './melodijs.js'
+  ## Exemples & patterns courants
 
-const app = createApp({
-  store: { sharedCount: 0 },
-  components: {
-    'my-comp': { template: '<div>hello</div>', data(){ return {} } }
-  }
-})
+  - Props : déclarer via un tableau ou un objet (avec `type` et `default`). Les valeurs d'attribut HTML sont coercées en Number/Boolean/String selon le type.
+  - v-model : deux-way binding pour `<input>`, `<textarea>`, `<select>` (l'input met à jour `this.prop`).
+  - v-for + :key : utiliser une clé unique stable (ex: `item.id`) pour meilleures performances et préservation d'état.
 
-app.mount('#app')
-```
+  ## Limitations connues
 
-`mount(target)` prend un sélecteur CSS ou un élément DOM.
+  - Pas de virtual DOM : certains rendus remplacent des parties de DOM par `innerHTML` / fragments. Pour de très grandes listes ou UIs complexes, un diffing plus fin serait préférable.
+  - Sandbox limité des expressions : les moustaches évaluent du JavaScript via `new Function(...)`. Éviter d'utiliser du template provenant d'utilisateurs non fiables.
+  - Gestion d'unsubscribe d'effets simplifiée : l'implémentation actuelle garde des placeholders pour cleanup mais n'est pas complète.
 
-### Composant : forme d'une définition
+  ## Contribution
 
-Un composant est un objet qui peut contenir :
+  - Issues / PRs bienvenues : corriger bugs, améliorer la gestion des effets, ajouter une API publique pour la mise à jour des slots, ajouter des tests.
 
-- `template`: chaîne, ou `{ el: '#id' }` pour prendre le HTML d'un `<template>`, ou `{ url: '...' }` pour fetcher.
-- `data()` : fonction retournant l'état initial (objet). `this` n'est pas lié; utilisez `this` depuis les méthodes.
-- `methods`: objet de fonctions, qui seront liées au `state` du composant.
-- `props`: tableau de noms ou objet { name: { type: Type, default: ... } }
-- `hooks`: objet contenant `beforeMount`, `mounted`, `beforeUpdate`, `updated`, `unmounted`.
+  ## Licence
 
-Exemple :
+  Voir `LICENSE`.
 
-```js
-'my-counter': {
-  template: `<div><button @click="decrement">-</button> {{ count }} <button @click="increment">+</button></div>`,
-  props: { start: { type: Number, default: 0 } },
-  data(){ return { count: this.start } },
-  methods: { increment(){ this.count++ }, decrement(){ this.count-- } }
-}
-```
+  ---
 
-### Cycle de vie (hooks)
-
-Les hooks disponibles dans `hooks` :
-- `beforeMount()` — appelé avant le premier rendu
-- `mounted()` — après le premier rendu
-- `beforeUpdate()` — avant un rendu déclenché par une modification
-- `updated()` — après un rendu déclenché par une modification
-- `unmounted()` — lors du démontage
-
-Appelez-les depuis l'objet `hooks` (les fonctions reçoivent `this` lié au state du composant).
-
-### Réactivité
-
-L'état du composant est un `Proxy` qui déclenche `_render()` de façon asynchrone (microtask) quand vous changez une propriété. Par exemple : `this.count = 5` déclenchera un re-render.
-
-### Store global
-
-La propriété `store` fournie à `createApp({ store: { ... } })` devient accessible à chaque composant via `this.$store`. C'est un objet réactif : modifier `this.$store.foo` provoquera le re-render des composants montés.
-
-## Templates et sources
-
-Un `template` peut être :
-
-- Une chaîne (HTML) directement dans la définition.
-- `{ el: '#tpl' }` pour récupérer le contenu d'un `<template id="tpl">` dans la page.
-- `{ url: '/path/to/template.html' }` pour récupérer le template via fetch (asynchrone).
-
-Note : si le template est vide, la librairie prendra `el.innerHTML` (le contenu light DOM) comme template.
-
-## Directives supportées
-
-### Interpolation `{{ ... }}`
-
-- Vous pouvez écrire des expressions JavaScript complètes dans les moustaches. L'expression est évaluée avec accès à l'état du composant (this/state) et au scope local (par ex. variables introduites par `v-for`).
-- Exemples : `{{ count }}`, `{{ items.length }}`, `{{ item.name.toUpperCase() }}`.
-- Attention : ceci exécute du JavaScript passé par le template — évitez d'évaluer du contenu non fiable.
-
-### v-if / v-else-if / v-else
-
-- `v-if="expression"` : rend la balise uniquement si `expression` est truthy.
-- `v-else-if="expression"` et `v-else` fonctionnent en chaîne : la librairie recherche la première branche vraie.
-- Les noeuds texte contenant uniquement des espaces entre les branches sont ignorés (vous pouvez formater votre HTML librement).
-
-Exemple :
-
-```html
-<div v-if="user">Bonjour {{ user.name }}</div>
-<div v-else>Pas connecté</div>
-```
-
-### v-show
-
-- `v-show="expression"` applique un `style="display:none"` quand `expression` est false. La balise reste présente dans le DOM.
-
-### v-for
-
-- Deux formes :
-  - `v-for="item in items"` pour les tableaux
-  - `v-for="(val, key) in obj"` pour les objets (dictionnaires) — `key` contient la propriété, `val` la valeur
-
-Exemples :
-
-```html
-<li v-for="(it, idx) in items">{{ idx }} - {{ it }}</li>
-<li v-for="(val, key) in dict">{{ key }} -> {{ val.name }}</li>
-```
-
-Note : l'expression après `in` peut être n'importe quelle expression JS (p.ex. `getList()` si définie dans l'état).
-
-### v-pre
-
-- `v-pre` sur un élément désactive le traitement des directives et des moustaches dans cette sous-arbre. Utile pour afficher du code source ou du raw template.
-
-### v-model
-
-- `v-model="propName"` lie un input (ou select/textarea) à `this.propName`. Les changements d'input mettent à jour l'état.
-
-### @event (raccourci)
-
-- `@click="doSomething"` est transformé en `data-on-click="doSomething"` et la librairie attache la méthode correspondante.
-
-## Slots (default & named) et réactivité des slots
-
-- Les composants peuvent utiliser `<slot>` pour recevoir du contenu depuis leur utilisation (light DOM).
-- Slots nommés : `<slot name="footer"></slot>` et dans le parent : `<div slot="footer">...<div>`.
-- Réactivité des slots : MelodiJS copie le contenu light DOM dans un conteneur interne (`_slotSource`) au moment du montage puis le réinsère à chaque rendu (clonage). Cela permet que le contenu du slot soit retraité (directives, interpolation) à chaque render.
-
-Comment mettre à jour un slot depuis le code (exemple avancé) :
-
-```js
-const panel = document.querySelector('panel-box')
-panel.__melodijs_instance._slotSource.innerHTML = '<p>nouveau contenu</p>'
-panel.__melodijs_instance._render()
-```
-
-Note : ceci utilise les propriétés internes `_slotSource` et `_render()` exposées par l'instance. Si vous préférez une API publique pour cela, on peut l'ajouter.
-
-## Événements parent-enfant: `$emit` / `$on`
-
-- Dans une méthode (ou depuis le `state`), vous pouvez appeler `this.$emit('event-name', payload)` pour émettre un événement local.
-- Les handlers enregistrés via `this.$on('event-name', handler)` seront appelés : d'abord les handlers locaux, puis la librairie remontera la chaîne DOM vers les ancêtres et appellera les handlers définis sur les composants ancêtres (bubbling). Les handlers sont liées au `state` du composant qui les enregistre.
-
-Exemple :
-
-```js
-// child
-methods: {
-  send(){ this.$emit('child-ping', { msg: 'hello' }) }
-}
-
-// parent (dans hooks.mounted)
-hooks: { mounted(){ this.$on('child-ping', payload => { console.log('got', payload) }) } }
-```
-
-## Examples pratiques
-
-### 1) Counter
-
-```js
-'my-counter': {
-  template: `
-    <div>
-      <button @click="decrement">-</button>
-      <span>{{ count }}</span>
-      <button @click="increment">+</button>
-      <input type="number" v-model="count" />
-    </div>`,
-  data(){ return { count: 0 } },
-  methods: {
-    increment(){ this.count = Number(this.count) + 1 },
-    decrement(){ this.count = Number(this.count) - 1 }
-  }
-}
-```
-
-### 2) v-for over object
-
-```html
-<ul>
-  <li v-for="(val, key) in itemsObj">{{ key }} => {{ val.name }}</li>
-<ul>
-```
-
-### 3) Parent/Child communication
-
-Parent component :
-
-```js
-hooks: { mounted(){ this.$on('child-ping', payload => { this.message = payload }) } }
-```
-
-Child :
-
-```js
-methods: { ping(){ this.$emit('child-ping', 'hello parent') } }
-```
-
-## Bonnes pratiques & limitations
-
-- Séparez logique et template : gardez les expressions dans `{{}}` courtes et de préférence lisibles.
-- L'évaluation des moustaches accepte du JS arbitraire — évitez d'exécuter du code non fiable provenant d'utilisateurs.
-- Cette implémentation n'utilise pas de virtual DOM : chaque changement provoque une réécriture (innerHTML) du contenu du composant. Pour des UIs très performantes ou avec de très grands arbres DOM, une approche plus fine (diffing) serait préférable.
-- Slots : la stratégie actuelle déplace les enfants originaux dans un conteneur interne. Si vous avez du code externe qui modifie directement les enfants après le montage, ces modifications ne seront pas visibles à moins de mettre à jour `_slotSource` ou d'ajouter un mécanisme pour relire `this.el` à chaque render.
-
-## Débogage & FAQ
-
-- "Mes moustaches ne s'évaluent pas" — vérifiez que vous n'avez pas `v-pre` sur l'élément parent. Vérifiez aussi la console pour les erreurs JS dans vos expressions.
-- "v-if ne marche pas entre balises" — il est maintenant tolerant aux sauts de ligne / espaces entre branches. Assurez-vous que les blocs `v-if` / `v-else-if` / `v-else` sont sur le même niveau DOM.
-- "v-for ne boucle pas sur un objet" — utilisez la forme `(val, key) in obj` ; l'expression après `in` est evaluée comme JS et peut être n'importe quoi retournant un objet.
-
-## Prochaines améliorations possibles
-
-- API publique pour mettre à jour le contenu de slot au lieu d'utiliser `_slotSource`.
-- Meilleure sandboxing des expressions JS.
-- Un système de propagation d'événements plus fin (stopPropagation, non-bubbling, event object complet).
-- Support de bindings d'attribut `:class`, `:style` etc.
-
----
-
-Si vous voulez que j'ajoute une section d'API générée automatiquement (liste des méthodes publiques, signatures et exemples de tests unitaires), je peux l'ajouter. Voulez-vous que je crée aussi un `docs.html` interactif à partir de ce README ?
-# MelodiJS — tiny reactive components
-
-This repo contains a minimal reactive component library inspired by Vue.js. It supports:
-
-- Component definitions with `template`, `data()`, `methods`, and `props` (declaration/validation)
-- Reactive local state via `Proxy`
-- Global reactive `store` shared between components (`this.$store` in methods and `{{ $store.some }}` in templates)
-- Template sources: inline string, `<template id="...">` via `{ el: '#id' }`, or remote file via `{ url: '...' }` (requires serving over HTTP)
-- Event shorthand `@click`, `v-model` two-way binding
-- Lifecycle hooks: `beforeMount`, `mounted`, `beforeUpdate`, `updated`, `unmounted` (prefer declared in `hooks` or top-level keys; backward compatible with old `methods` placement)
-- `unmount()` cleanup to remove listeners and deregister from app store notifications
-
-Quick start
-
-1. Serve the project folder over HTTP (recommended):
-
-```bash
-python3 -m http.server 8000
-# open http://localhost:8000
-```
-
-2. Open `index.html` in your browser.
-
-Testing
-
-This repo includes a small test harness using `jsdom`.
-
-Install and run tests:
-
-```bash
-npm install
-npm test
+  Si vous voulez, je peux aussi :
+  - générer automatiquement une `API.md` listant les méthodes publiques et hooks,
+  - ajouter des tests supplémentaires ou améliorer la CI (ex: GitHub Actions) pour exécuter `npm test` automatiquement.
+
+  Résumé de ce commit : README consolidé et clarifié (FR) — décrit fonctionnalités, structure, logique et étapes pour démarrer.
 ```
 
 Notes

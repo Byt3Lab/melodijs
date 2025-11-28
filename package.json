@@ -1,0 +1,11 @@
+{
+  "name": "melodijs",
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "test": "node tests/run-tests.js"
+  },
+  "devDependencies": {
+    "jsdom": "^21.1.0"
+  }
+}

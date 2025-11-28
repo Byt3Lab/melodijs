@@ -1,0 +1,1156 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MelodiJS - Documentation</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    :root {
+      --primary: #6366f1;
+      --primary-dark: #4f46e5;
+      --secondary: #8b5cf6;
+      --success: #10b981;
+      --bg: #0f172a;
+      --bg-card: #1e293b;
+      --bg-code: #0d1117;
+      --text: #e2e8f0;
+      --text-dim: #94a3b8;
+      --border: #334155;
+      --accent: #f59e0b;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.7;
+    }
+
+    header {
+      background: linear-gradient(135deg, var(--primary), var(--secondary));
+      padding: 3rem 2rem;
+      text-align: center;
+      border-bottom: 3px solid var(--accent);
+    }
+
+    header h1 {
+      font-size: 3rem;
+      font-weight: 800;
+      margin-bottom: 0.5rem;
+      text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+    }
+
+    header p {
+      font-size: 1.2rem;
+      opacity: 0.95;
+    }
+
+    nav {
+      position: sticky;
+      top: 0;
+      background: var(--bg-card);
+      border-bottom: 1px solid var(--border);
+      padding: 1rem;
+      z-index: 100;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+    }
+
+    nav ul {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1rem;
+      list-style: none;
+      justify-content: center;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    nav a {
+      color: var(--text);
+      text-decoration: none;
+      padding: 0.5rem 1rem;
+      border-radius: 6px;
+      transition: all 0.2s;
+      font-weight: 500;
+    }
+
+    nav a:hover {
+      background: var(--primary);
+      transform: translateY(-2px);
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 2rem;
+    }
+
+    section {
+      background: var(--bg-card);
+      padding: 2rem;
+      margin-bottom: 2rem;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+    }
+
+    h2 {
+      font-size: 2rem;
+      margin-bottom: 1.5rem;
+      color: var(--primary);
+      border-bottom: 2px solid var(--primary);
+      padding-bottom: 0.5rem;
+    }
+
+    h3 {
+      font-size: 1.5rem;
+      margin: 2rem 0 1rem;
+      color: var(--secondary);
+    }
+
+    h4 {
+      font-size: 1.2rem;
+      margin: 1.5rem 0 0.75rem;
+      color: var(--accent);
+    }
+
+    .code-block {
+      background: var(--bg-code);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1.5rem;
+      margin: 1rem 0;
+      overflow-x: auto;
+      position: relative;
+    }
+
+    .code-block pre {
+      margin: 0;
+      font-family: 'Fira Code', 'Consolas', monospace;
+      font-size: 0.9rem;
+      line-height: 1.6;
+    }
+
+    .code-block code {
+      color: #e2e8f0;
+    }
+
+    .lang-label {
+      position: absolute;
+      top: 0.5rem;
+      right: 0.5rem;
+      background: var(--primary);
+      color: white;
+      padding: 0.25rem 0.75rem;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+
+    .example {
+      background: linear-gradient(135deg, rgba(99, 102, 241, 0.1), rgba(139, 92, 246, 0.1));
+      border-left: 4px solid var(--primary);
+      padding: 1.5rem;
+      margin: 1.5rem 0;
+      border-radius: 8px;
+    }
+
+    .warning {
+      background: linear-gradient(135deg, rgba(245, 158, 11, 0.1), rgba(249, 115, 22, 0.1));
+      border-left: 4px solid var(--accent);
+      padding: 1rem;
+      margin: 1rem 0;
+      border-radius: 8px;
+    }
+
+    .success {
+      background: linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(5, 150, 105, 0.1));
+      border-left: 4px solid var(--success);
+      padding: 1rem;
+      margin: 1rem 0;
+      border-radius: 8px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 1rem 0;
+    }
+
+    th,
+    td {
+      padding: 0.75rem;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+    }
+
+    th {
+      background: var(--bg-code);
+      color: var(--primary);
+      font-weight: 600;
+    }
+
+    ul,
+    ol {
+      margin-left: 2rem;
+      margin-bottom: 1rem;
+    }
+
+    li {
+      margin-bottom: 0.5rem;
+    }
+
+    .badge {
+      display: inline-block;
+      background: var(--primary);
+      color: white;
+      padding: 0.25rem 0.75rem;
+      border-radius: 12px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      margin-left: 0.5rem;
+    }
+
+    .badge.new {
+      background: var(--success);
+    }
+
+    .badge.advanced {
+      background: var(--secondary);
+    }
+
+    footer {
+      text-align: center;
+      padding: 2rem;
+      color: var(--text-dim);
+      border-top: 1px solid var(--border);
+      margin-top: 3rem;
+    }
+
+    @media (max-width: 768px) {
+      header h1 {
+        font-size: 2rem;
+      }
+
+      section {
+        padding: 1.5rem;
+      }
+
+      .container {
+        padding: 1rem;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <header>
+    <h1>🎵 MelodiJS</h1>
+    <p>Framework JavaScript Réactif Ultra-Léger</p>
+  </header>
+
+  <nav>
+    <ul>
+      <li><a href="#intro">Introduction</a></li>
+      <li><a href="#install">Installation</a></li>
+      <li><a href="#reactivity">Réactivité</a></li>
+      <li><a href="#components">Composants</a></li>
+      <li><a href="#directives">Directives</a></li>
+      <li><a href="#lifecycle">Lifecycle</a></li>
+      <li><a href="#slots">Slots</a></li>
+      <li><a href="#store">Store</a></li>
+      <li><a href="#events">Événements</a></li>
+    </ul>
+  </nav>
+
+  <div class="container">
+    <!-- Introduction -->
+    <section id="intro">
+      <h2>📚 Introduction</h2>
+      <p>MelodiJS est un framework JavaScript moderne qui combine la simplicité de Vue.js avec la performance de
+        SolidJS. Il utilise une réactivité <strong>fine-grained</strong> basée sur des signaux pour des mises à jour DOM
+        ultra-rapides.</p>
+
+      <h3>Caractéristiques principales</h3>
+      <ul>
+        <li>✨ <strong>Réactivité fine-grained</strong> - Seulement ce qui change est mis à jour</li>
+        <li>🚀 <strong>Performance</strong> - Pas de Virtual DOM, manipulation DOM directe</li>
+        <li>🎯 <strong>API familière</strong> - Syntaxe inspirée de Vue.js</li>
+        <li>📦 <strong>Ultra-léger</strong> - ~35KB non compressé</li>
+        <li>🔧 <strong>Computed Properties</strong> - Valeurs dérivées avec cache automatique</li>
+        <li>🎨 <strong>Slots</strong> - Composition de composants flexible</li>
+      </ul>
+    </section>
+
+    <!-- Installation -->
+    <section id="install">
+      <h2>⚙️ Installation & Démarrage</h2>
+
+      <h3>Installation</h3>
+      <div class="code-block">
+        <span class="lang-label">HTML</span>
+        <pre><code>&lt;script type="module"&gt;
+    import { createApp } from './melodijs.js';
+&lt;/script&gt;</code></pre>
+      </div>
+
+      <h3>Exemple minimal</h3>
+      <div class="example">
+        <h4>HTML</h4>
+        <div class="code-block">
+          <span class="lang-label">HTML</span>
+          <pre><code>&lt;div id="app"&gt;
+    &lt;my-counter&gt;&lt;/my-counter&gt;
+&lt;/div&gt;
+
+&lt;script type="module"&gt;
+    import { createApp } from './melodijs.js';
+
+    const app = createApp({
+        components: {
+            'my-counter': {
+                template: `
+                    &lt;div&gt;
+                        &lt;p&gt;Count: {{ count }}&lt;/p&gt;
+                        &lt;button @click="increment"&gt;+&lt;/button&gt;
+                    &lt;/div&gt;
+                `,
+                data() {
+                    return { count: 0 }
+                },
+                methods: {
+                    increment() {
+                        this.count++;
+                    }
+                }
+            }
+        }
+    });
+
+    app.mount('#app');
+&lt;/script&gt;</code></pre>
+        </div>
+      </div>
+    </section>
+
+    <!-- Réactivité -->
+    <section id="reactivity">
+      <h2>⚡ Réactivité</h2>
+
+      <h3>Data Properties</h3>
+      <p>Les propriétés retournées par <code>data()</code> sont automatiquement réactives.</p>
+      <div class="code-block">
+        <span class="lang-label">JavaScript</span>
+        <pre><code>data() {
+    return {
+        message: 'Hello',
+        count: 0,
+        user: { name: 'Alice' }
+    }
+}</code></pre>
+      </div>
+
+      <h3>Computed Properties <span class="badge new">Nouveau</span></h3>
+      <p>Les propriétés calculées se mettent à jour automatiquement quand leurs dépendances changent.</p>
+
+      <div class="example">
+        <h4>Exemple Simple</h4>
+        <div class="code-block">
+          <span class="lang-label">JavaScript</span>
+          <pre><code>{
+    data() {
+        return {
+            firstName: 'John',
+            lastName: 'Doe'
+        }
+    },
+    computed: {
+        fullName() {
+            return this.firstName + ' ' + this.lastName;
+        }
+    }
+}</code></pre>
+        </div>
+        <p>Dans le template : <code>{{ fullName }}</code> affichera "John Doe"</p>
+      </div>
+
+      <div class="example">
+        <h4>Exemple Complexe</h4>
+        <div class="code-block">
+          <span class="lang-label">JavaScript</span>
+          <pre><code>{
+    data() {
+        return {
+            items: [
+                { name: 'Pomme', price: 2, qty: 3 },
+                { name: 'Banane', price: 1, qty: 5 }
+            ]
+        }
+    },
+    computed: {
+        totalItems() {
+            return this.items.reduce((sum, item) => sum + item.qty, 0);
+        },
+        totalPrice() {
+            return this.items.reduce((sum, item) => sum + (item.price * item.qty), 0);
+        },
+        expensiveItems() {
+            return this.items.filter(item => item.price > 1.5);
+        }
+    }
+}</code></pre>
+        </div>
+      </div>
+
+      <div class="warning">
+        <strong>⚠️ Important :</strong> Les computed properties sont <strong>read-only</strong>. Vous ne pouvez pas les
+        modifier directement.
+      </div>
+    </section>
+
+    <!-- Composants -->
+    <section id="components">
+      <h2>🧩 Composants</h2>
+
+      <h3>Définition de composant</h3>
+      <div class="code-block">
+        <span class="lang-label">JavaScript</span>
+        <pre><code>const app = createApp({
+    components: {
+        'nom-composant': {
+            template: '...',      // HTML template
+            data() { return {} }, // Données réactives
+            computed: {},         // Propriétés calculées
+            methods: {},          // Méthodes
+            props: [],            // Props acceptées
+            hooks: {}             // Lifecycle hooks
+        }
+    }
+});</code></pre>
+      </div>
+
+      <h3>Templates</h3>
+      <p>Trois façons de définir un template :</p>
+
+      <h4>1. Template inline</h4>
+      <div class="code-block">
+        <span class="lang-label">JavaScript</span>
+        <pre><code>template: `&lt;div&gt;Hello {{ name }}&lt;/div&gt;`</code></pre>
+      </div>
+
+      <h4>2. Template depuis un élément HTML</h4>
+      <div class="code-block">
+        <span class="lang-label">JavaScript</span>
+        <pre><code>template: { el: '#my-template' }</code></pre>
+      </div>
+      <div class="code-block">
+        <span class="lang-label">HTML</span>
+        <pre><code>&lt;template id="my-template"&gt;
+    &lt;div&gt;Hello {{ name }}&lt;/div&gt;
+&lt;/template&gt;</code></pre>
+      </div>
+
+      <h4>3. Template depuis un fichier</h4>
+      <div class="code-block">
+        <span class="lang-label">JavaScript</span>
+        <pre><code>template: { url: './templates/my-component.html' }</code></pre>
+      </div>
+
+      <h3>Props</h3>
+      <p>Passer des données au composant enfant.</p>
+
+      <div class="example">
+        <h4>Définition simple</h4>
+        <div class="code-block">
+          <span class="lang-label">JavaScript</span>
+          <pre><code>{
+    props: ['title', 'count']
+}</code></pre>
+        </div>
+
+        <h4>Définition avec validation</h4>
+        <div class="code-block">
+          <span class="lang-label">JavaScript</span>
+          <pre><code>{
+    props: {
+        title: {
+            type: String,
+            default: 'Sans titre'
+        },
+        count: {
+            type: Number,
+            default: 0
+        },
+        isActive: {
+            type: Boolean,
+            default: false
+        }
+    }
+}</code></pre>
+        </div>
+
+        <h4>Utilisation</h4>
+        <div class="code-block">
+          <span class="lang-label">HTML</span>
+          <pre><code>&lt;my-component title="Bonjour" count="42" isActive&gt;&lt;/my-component&gt;</code></pre>
+        </div>
+      </div>
+    </section>
+
+    <!-- Directives -->
+    <section id="directives">
+      <h2>🎯 Directives</h2>
+
+      <h3>Interpolation de texte</h3>
+      <div class="code-block">
+        <span class="lang-label">HTML</span>
+        <pre><code>&lt;p&gt;Message: {{ message }}&lt;/p&gt;
+&lt;p&gt;Total: {{ price * quantity }}&lt;/p&gt;</code></pre>
+      </div>
+
+      <h3>v-if / v-show</h3>
+      <p><code>v-if</code> ajoute/supprime l'élément du DOM. <code>v-show</code> toggle le style <code>display</code>.
+      </p>
+      <div class="code-block">
+        <span class="lang-label">HTML</span>
+        <pre><code>&lt;div v-if="isVisible"&gt;Je suis visible si isVisible = true&lt;/div&gt;
+&lt;div v-show="isActive"&gt;Je suis toujours dans le DOM&lt;/div&gt;</code></pre>
+      </div>
+
+      <h3>v-for</h3>
+      <p>Boucler sur des tableaux ou objets.</p>
+
+      <div class="example">
+        <h4>Tableau</h4>
+        <div class="code-block">
+          <span class="lang-label">HTML</span>
+          <pre><code>&lt;ul&gt;
+    &lt;li v-for="item in items"&gt;{{ item }}&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;!-- Avec index --&gt;
+&lt;ul&gt;
+    &lt;li v-for="(item, index) in items"&gt;
+        {{ index }}: {{ item }}
+    &lt;/li&gt;
+&lt;/ul&gt;</code></pre>
+        </div>
+
+        <h4>Objet</h4>
+        <div class="code-block">
+          <span class="lang-label">HTML</span>
+          <pre><code>&lt;div v-for="(value, key) in user"&gt;
+    {{ key }}: {{ value }}
+&lt;/div&gt;</code></pre>
+        </div>
+      </div>
+
+      <h3>Optimisation avec :key <span class="badge new">Nouveau</span></h3>
+      <p>Pour de meilleures performances sur de grandes listes, utilisez l'attribut <code>:key</code> pour aider
+        MelodiJS à identifier et réutiliser les éléments existants au lieu de tout recréer.</p>
+
+      <div class="success">
+        <strong>✨ Avantages de :key :</strong>
+        <ul>
+          <li>🚀 Réutilisation des éléments DOM existants</li>
+          <li>💾 Préservation de l'état des inputs et composants</li>
+          <li>⚡ Mises à jour ultra-rapides sur de grandes listes</li>
+          <li>🎯 Animations et transitions plus fluides</li>
+        </ul>
+      </div>
+
+      <div class="example">
+        <h4>Avec :key (recommandé)</h4>
+        <div class="code-block">
+          <span class="lang-label">HTML</span>
+          <pre><code>&lt;ul&gt;
+    &lt;li v-for="item in items" :key="item.id"&gt;
+        {{ item.name }}
+        &lt;input v-model="item.value"&gt;
+    &lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;!-- Avec index --&gt;
+&lt;li v-for="(item, index) in items" :key="item.id"&gt;
+    {{ index }}: {{ item.name }}
+&lt;/li&gt;</code></pre>
+        </div>
+      </div>
+
+      <div class="warning">
+        <strong>⚠️ Important :</strong>
+        <ul>
+          <li>Utilisez toujours une valeur <strong>unique et stable</strong> comme clé (ex: <code>item.id</code>)</li>
+          <li>Évitez d'utiliser l'index comme clé si l'ordre des éléments peut changer</li>
+          <li>Sans <code>:key</code>, tous les éléments sont recréés à chaque changement (fonctionnement de base)</li>
+        </ul>
+      </div>
+
+      <h3>v-model</h3>
+      <p>Liaison bidirectionnelle pour les formulaires.</p>
+      <div class="code-block">
+        <span class="lang-label">HTML</span>
+        <pre><code>&lt;!-- Input text --&gt;
+&lt;input type="text" v-model="username"&gt;
+
+&lt;!-- Textarea --&gt;
+&lt;textarea v-model="message"&gt;&lt;/textarea&gt;
+
+&lt;!-- Checkbox --&gt;
+&lt;input type="checkbox" v-model="isAccepted"&gt;
+
+&lt;!-- Select --&gt;
+&lt;select v-model="selected"&gt;
+    &lt;option value="a"&gt;Option A&lt;/option&gt;
+    &lt;option value="b"&gt;Option B&lt;/option&gt;
+&lt;/select&gt;</code></pre>
+      </div>
+
+      <h3>v-bind / :</h3>
+      <p>Lier des attributs de manière réactive.</p>
+      <div class="code-block">
+        <span class="lang-label">HTML</span>
+        <pre><code>&lt;!-- Syntaxe longue --&gt;
+&lt;img v-bind:src="imageUrl" v-bind:alt="imageAlt"&gt;
+
+&lt;!-- Syntaxe courte --&gt;
+&lt;img :src="imageUrl" :alt="imageAlt"&gt;
+
+&lt;!-- Classes dynamiques --&gt;
+&lt;div :class="{ active: isActive, disabled: !isEnabled }"&gt;&lt;/div&gt;
+
+&lt;!-- Style inline --&gt;
+&lt;div :style="{ color: textColor, fontSize: size + 'px' }"&gt;&lt;/div&gt;</code></pre>
+      </div>
+
+      <h3>@événement / v-on:</h3>
+      <p>Écouter les événements DOM.</p>
+      <div class="code-block">
+        <span class="lang-label">HTML</span>
+        <pre><code>&lt;!-- Syntaxe courte --&gt;
+&lt;button @click="handleClick"&gt;Cliquer&lt;/button&gt;
+&lt;input @input="handleInput"&gt;
+&lt;form @submit="handleSubmit"&gt;
+
+&lt;!-- Syntaxe longue --&gt;
+&lt;button v-on:click="handleClick"&gt;Cliquer&lt;/button&gt;
+
+&lt;!-- Avec expression --&gt;
+&lt;button @click="count++"&gt;Incrémenter&lt;/button&gt;</code></pre>
+      </div>
+
+      <h3>v-pre</h3>
+      <p>Ignorer la compilation pour cet élément et ses enfants.</p>
+      <div class="code-block">
+        <span class="lang-label">HTML</span>
+        <pre><code>&lt;div v-pre&gt;
+    {{ ceci ne sera pas compilé }}
+&lt;/div&gt;</code></pre>
+      </div>
+    </section>
+
+    <!-- Lifecycle -->
+    <section id="lifecycle">
+      <h2>🔄 Lifecycle Hooks</h2>
+      <p>Les hooks de lifecycle permettent d'exécuter du code à des moments précis du cycle de vie du composant.</p>
+
+      <div class="code-block">
+        <span class="lang-label">JavaScript</span>
+        <pre><code>{
+    hooks: {
+        beforeMount() {
+            // Avant le montage dans le DOM
+            console.log('Le composant va être monté');
+        },
+        mounted() {
+            // Après le montage dans le DOM
+            console.log('Le composant est monté');
+            // Bon endroit pour les requêtes API, timers, etc.
+        },
+        beforeUpdate() {
+            // Avant une mise à jour du DOM
+            console.log('Le composant va être mis à jour');
+        },
+        updated() {
+            // Après une mise à jour du DOM
+            console.log('Le composant a été mis à jour');
+        },
+        unmounted() {
+            // Quand le composant est détruit
+            console.log('Le composant est détruit');
+            // Nettoyage : clearInterval, removeEventListener, etc.
+        }
+    }
+}</code></pre>
+      </div>
+
+      <h3>Ordre d'exécution</h3>
+      <div class="success">
+        <ol>
+          <li><strong>beforeMount</strong> → Le composant existe mais n'est pas dans le DOM</li>
+          <li><strong>mounted</strong> → Le composant est dans le DOM et visible</li>
+          <li><strong>beforeUpdate</strong> → Une donnée a changé, avant re-rendu</li>
+          <li><strong>updated</strong> → Le DOM a été mis à jour</li>
+          <li><strong>unmounted</strong> → Le composant est supprimé</li>
+        </ol>
+      </div>
+
+      <div class="example">
+        <h4>Exemple pratique</h4>
+        <div class="code-block">
+          <span class="lang-label">JavaScript</span>
+          <pre><code>{
+    data() {
+        return {
+            time: new Date().toLocaleTimeString(),
+            timer: null
+        }
+    },
+    hooks: {
+        mounted() {
+            // Démarrer un timer
+            this.timer = setInterval(() => {
+                this.time = new Date().toLocaleTimeString();
+            }, 1000);
+        },
+        unmounted() {
+            // Nettoyer le timer
+            if (this.timer) {
+                clearInterval(this.timer);
+            }
+        }
+    }
+}</code></pre>
+        </div>
+      </div>
+    </section>
+
+    <!-- Slots -->
+    <section id="slots">
+      <h2>📦 Slots</h2>
+      <p>Les slots permettent de passer du contenu HTML au composant enfant.</p>
+
+      <h3>Slot par défaut</h3>
+      <div class="example">
+        <h4>Définition du composant</h4>
+        <div class="code-block">
+          <span class="lang-label">JavaScript</span>
+          <pre><code>'my-card': {
+    template: `
+        &lt;div class="card"&gt;
+            &lt;div class="card-body"&gt;
+                &lt;slot&gt;
+                    &lt;!-- Contenu par défaut si rien n'est fourni --&gt;
+                    &lt;p&gt;Aucun contenu&lt;/p&gt;
+                &lt;/slot&gt;
+            &lt;/div&gt;
+        &lt;/div&gt;
+    `
+}</code></pre>
+        </div>
+
+        <h4>Utilisation</h4>
+        <div class="code-block">
+          <span class="lang-label">HTML</span>
+          <pre><code>&lt;my-card&gt;
+    &lt;h3&gt;Titre de la carte&lt;/h3&gt;
+    &lt;p&gt;Contenu de la carte&lt;/p&gt;
+&lt;/my-card&gt;</code></pre>
+        </div>
+      </div>
+
+      <h3>Slots nommés</h3>
+      <div class="example">
+        <h4>Définition du composant</h4>
+        <div class="code-block">
+          <span class="lang-label">JavaScript</span>
+          <pre><code>'my-layout': {
+    template: `
+        &lt;div class="layout"&gt;
+            &lt;header&gt;
+                &lt;slot name="header"&gt;&lt;/slot&gt;
+            &lt;/header&gt;
+            &lt;main&gt;
+                &lt;slot&gt;&lt;/slot&gt; &lt;!-- Slot par défaut --&gt;
+            &lt;/main&gt;
+            &lt;footer&gt;
+                &lt;slot name="footer"&gt;&lt;/slot&gt;
+            &lt;/footer&gt;
+        &lt;/div&gt;
+    `
+}</code></pre>
+        </div>
+
+        <h4>Utilisation</h4>
+        <div class="code-block">
+          <span class="lang-label">HTML</span>
+          <pre><code>&lt;my-layout&gt;
+    &lt;div slot="header"&gt;
+        &lt;h1&gt;En-tête&lt;/h1&gt;
+    &lt;/div&gt;
+
+    &lt;p&gt;Contenu principal (slot par défaut)&lt;/p&gt;
+
+    &lt;div slot="footer"&gt;
+        &lt;p&gt;Pied de page&lt;/p&gt;
+    &lt;/div&gt;
+&lt;/my-layout&gt;</code></pre>
+        </div>
+      </div>
+
+      <h3>Composants imbriqués dans les slots</h3>
+      <div class="success">
+        <p>✅ Les composants MelodiJS fonctionnent correctement à l'intérieur des slots !</p>
+        <div class="code-block">
+          <span class="lang-label">HTML</span>
+          <pre><code>&lt;parent-component&gt;
+    &lt;child-component&gt;&lt;/child-component&gt;
+&lt;/parent-component&gt;</code></pre>
+        </div>
+      </div>
+    </section>
+
+    <!-- Store -->
+    <section id="store">
+      <h2>🗄️ Store Global</h2>
+      <p>Le store permet de partager des données entre tous les composants.</p>
+
+      <h3>Définition du store</h3>
+      <div class="code-block">
+        <span class="lang-label">JavaScript</span>
+        <pre><code>const app = createApp({
+    store: {
+        user: null,
+        isLoggedIn: false,
+        cartItems: []
+    },
+    components: { /* ... */ }
+});</code></pre>
+      </div>
+
+      <h3>Accès au store</h3>
+      <p>Le store est accessible via <code>this.$store</code> dans tous les composants.</p>
+
+      <div class="example">
+        <div class="code-block">
+          <span class="lang-label">JavaScript</span>
+          <pre><code>{
+    template: `
+        &lt;div&gt;
+            &lt;p v-if="$store.isLoggedIn"&gt;
+                Bonjour {{ $store.user.name }}
+            &lt;/p&gt;
+            &lt;button @click="login"&gt;Se connecter&lt;/button&gt;
+        &lt;/div&gt;
+    `,
+    methods: {
+        login() {
+            this.$store.user = { name: 'Alice', id: 1 };
+            this.$store.isLoggedIn = true;
+        },
+        addToCart(item) {
+            // Réassigner pour déclencher la réactivité
+            this.$store.cartItems = [...this.$store.cartItems, item];
+        }
+    }
+}</code></pre>
+        </div>
+      </div>
+
+      <div class="warning">
+        <strong>⚠️ Réactivité des tableaux :</strong> Pour modifier un tableau dans le store, réassignez-le complètement
+        :
+        <div class="code-block">
+          <pre><code>// ❌ Ne fonctionne pas (push ne déclenche pas la réactivité)
+this.$store.items.push(newItem);
+
+// ✅ Fonctionne
+this.$store.items = [...this.$store.items, newItem];</code></pre>
+        </div>
+      </div>
+    </section>
+
+    <!-- Événements -->
+    <section id="events">
+      <h2>📡 Événements Personnalisés</h2>
+      <p>Les composants peuvent communiquer via des événements personnalisés.</p>
+
+      <h3>Émettre un événement</h3>
+      <div class="code-block">
+        <span class="lang-label">JavaScript</span>
+        <pre><code>// Dans une méthode du composant enfant
+this.$emit('eventName', payload);</code></pre>
+      </div>
+
+      <h3>Écouter un événement</h3>
+      <div class="code-block">
+        <span class="lang-label">JavaScript</span>
+        <pre><code>// Dans le hook mounted du composant parent
+this.$on('eventName', (payload) => {
+    console.log('Événement reçu:', payload);
+});</code></pre>
+      </div>
+
+      <div class="example">
+        <h4>Exemple complet : Communication Parent-Enfant</h4>
+
+        <h4>Composant Enfant</h4>
+        <div class="code-block">
+          <span class="lang-label">JavaScript</span>
+          <pre><code>'child-component': {
+    template: `
+        &lt;button @click="sendMessage"&gt;
+            Envoyer au parent
+        &lt;/button&gt;
+    `,
+    methods: {
+        sendMessage() {
+            const message = 'Bonjour depuis l\'enfant!';
+            this.$emit('child-message', message);
+        }
+    }
+}</code></pre>
+        </div>
+
+        <h4>Composant Parent</h4>
+        <div class="code-block">
+          <span class="lang-label">JavaScript</span>
+          <pre><code>'parent-component': {
+    template: `
+        &lt;div&gt;
+            &lt;p&gt;Message reçu: {{ receivedMessage }}&lt;/p&gt;
+            &lt;child-component&gt;&lt;/child-component&gt;
+        &lt;/div&gt;
+    `,
+    data() {
+        return {
+            receivedMessage: ''
+        }
+    },
+    hooks: {
+        mounted() {
+            this.$on('child-message', (message) => {
+                this.receivedMessage = message;
+            });
+        }
+    }
+}</code></pre>
+        </div>
+      </div>
+
+      <div class="success">
+        <strong>✨ Bubble automatique :</strong> Les événements remontent automatiquement dans l'arbre des composants,
+        donc les ancêtres peuvent aussi les écouter !
+      </div>
+    </section>
+
+    <!-- Exemple Complexe -->
+    <section id="advanced">
+      <h2>🚀 Exemple Complexe Complet</h2>
+      <p>Voici un exemple d'application Todo complète utilisant toutes les fonctionnalités de MelodiJS.</p>
+
+      <div class="code-block">
+        <span class="lang-label">JavaScript</span>
+        <pre><code>import { createApp } from './melodijs.js';
+
+const app = createApp({
+    store: {
+        todos: [
+            { id: 1, text: 'Apprendre MelodiJS', done: false },
+            { id: 2, text: 'Créer une app', done: false }
+        ],
+        filter: 'all' // 'all', 'active', 'completed'
+    },
+    components: {
+        'todo-app': {
+            template: `
+                &lt;div class="todo-app"&gt;
+                    &lt;h1&gt;Ma Todo App&lt;/h1&gt;
+                    
+                    &lt;todo-input&gt;&lt;/todo-input&gt;
+                    
+                    &lt;div class="filters"&gt;
+                        &lt;button @click="setFilter('all')" 
+                                :class="{ active: $store.filter === 'all' }"&gt;
+                            Tous ({{ totalCount }})
+                        &lt;/button&gt;
+                        &lt;button @click="setFilter('active')" 
+                                :class="{ active: $store.filter === 'active' }"&gt;
+                            Actifs ({{ activeCount }})
+                        &lt;/button&gt;
+                        &lt;button @click="setFilter('completed')" 
+                                :class="{ active: $store.filter === 'completed' }"&gt;
+                            Terminés ({{ completedCount }})
+                        &lt;/button&gt;
+                    &lt;/div&gt;
+                    
+                    &lt;todo-list&gt;&lt;/todo-list&gt;
+                &lt;/div&gt;
+            `,
+            computed: {
+                totalCount() {
+                    return this.$store.todos.length;
+                },
+                activeCount() {
+                    return this.$store.todos.filter(t => !t.done).length;
+                },
+                completedCount() {
+                    return this.$store.todos.filter(t => t.done).length;
+                }
+            },
+            methods: {
+                setFilter(filter) {
+                    this.$store.filter = filter;
+                }
+            }
+        },
+        
+        'todo-input': {
+            template: `
+                &lt;div class="todo-input"&gt;
+                    &lt;input type="text" 
+                           v-model="newTodo" 
+                           @keyup.enter="addTodo"
+                           placeholder="Nouvelle tâche..."&gt;
+                    &lt;button @click="addTodo"&gt;Ajouter&lt;/button&gt;
+                &lt;/div&gt;
+            `,
+            data() {
+                return {
+                    newTodo: ''
+                }
+            },
+            methods: {
+                addTodo() {
+                    if (this.newTodo.trim()) {
+                        const todo = {
+                            id: Date.now(),
+                            text: this.newTodo,
+                            done: false
+                        };
+                        this.$store.todos = [...this.$store.todos, todo];
+                        this.newTodo = '';
+                    }
+                }
+            }
+        },
+        
+        'todo-list': {
+            template: `
+                &lt;ul class="todo-list"&gt;
+                    &lt;todo-item v-for="todo in filteredTodos" 
+                               :id="todo.id"
+                               :text="todo.text"
+                               :done="todo.done"&gt;
+                    &lt;/todo-item&gt;
+                &lt;/ul&gt;
+            `,
+            computed: {
+                filteredTodos() {
+                    const filter = this.$store.filter;
+                    const todos = this.$store.todos;
+                    
+                    if (filter === 'active') {
+                        return todos.filter(t => !t.done);
+                    }
+                    if (filter === 'completed') {
+                        return todos.filter(t => t.done);
+                    }
+                    return todos;
+                }
+            }
+        },
+        
+        'todo-item': {
+            template: `
+                &lt;li :class="{ done: done }"&gt;
+                    &lt;input type="checkbox" 
+                           :checked="done"
+                           @change="toggle"&gt;
+                    &lt;span&gt;{{ text }}&lt;/span&gt;
+                    &lt;button @click="remove" class="delete"&gt;×&lt;/button&gt;
+                &lt;/li&gt;
+            `,
+            props: {
+                id: { type: Number },
+                text: { type: String },
+                done: { type: Boolean }
+            },
+            methods: {
+                toggle() {
+                    this.$store.todos = this.$store.todos.map(t =>
+                        t.id === this.id ? { ...t, done: !t.done } : t
+                    );
+                },
+                remove() {
+                    this.$store.todos = this.$store.todos.filter(
+                        t => t.id !== this.id
+                    );
+                }
+            }
+        }
+    }
+});
+
+app.mount('#app');</code></pre>
+      </div>
+    </section>
+
+    <!-- Best Practices -->
+    <section id="best-practices">
+      <h2>💡 Bonnes Pratiques</h2>
+
+      <h3>1. Nommage des composants</h3>
+      <ul>
+        <li>✅ Utilisez des kebab-case : <code>my-component</code></li>
+        <li>✅ Utilisez au moins 2 mots pour éviter les conflits avec HTML : <code>user-card</code></li>
+        <li>❌ Évitez les noms génériques : <code>item</code>, <code>element</code></li>
+      </ul>
+
+      <h3>2. Réactivité des tableaux</h3>
+      <div class="code-block">
+        <pre><code>// ✅ Bon
+this.items = [...this.items, newItem];
+this.items = this.items.filter(item => item.id !== id);
+
+// ❌ À éviter
+this.items.push(newItem);
+this.items.splice(index, 1);</code></pre>
+      </div>
+
+      <h3>3. Computed vs Methods</h3>
+      <ul>
+        <li>✅ Utilisez <code>computed</code> pour des valeurs dérivées (avec cache)</li>
+        <li>✅ Utilisez <code>methods</code> pour des actions/événements</li>
+      </ul>
+
+      <h3>4. Nettoyage dans unmounted</h3>
+      <div class="code-block">
+        <pre><code>hooks: {
+    mounted() {
+        this.timer = setInterval(() => {...}, 1000);
+        window.addEventListener('resize', this.handleResize);
+    },
+    unmounted() {
+        clearInterval(this.timer);
+        window.removeEventListener('resize', this.handleResize);
+    }
+}</code></pre>
+      </div>
+    </section>
+  </div>
+
+  <footer>
+    <p>MelodiJS - Framework JavaScript Réactif Ultra-Léger</p>
+    <p>Made with ❤️ - Version 1.0</p>
+  </footer>
+</body>
+
+</html>

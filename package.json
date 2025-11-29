@@ -3,9 +3,15 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
+    "build": "tsc",
+    "dev": "ts-node src/melodijs.ts",
     "test": "node tests/run-tests.js"
   },
   "devDependencies": {
-    "jsdom": "^21.1.0"
+    "@types/jsdom": "^27.0.0",
+    "@types/node": "^24.10.1",
+    "jsdom": "^21.1.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.3"
   }
 }

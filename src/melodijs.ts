@@ -1,26 +1,55 @@
 // --- Fine-grain reactivity primitives regroupées ---
 
+type SignalRead<T> = () => T;
+type SignalWrite<T> = (next: T) => void;
+type EffectFn = () => void | (() => void);
+type CleanupFn = () => void;
+
+interface MelodiOptions {
+    components?: Record<string, ComponentDef>;
+    store?: Record<string, any>;
+}
+
+interface ComponentDef {
+    template?: string | { el?: string; url?: string };
+    data?: () => Record<string, any>;
+    methods?: Record<string, (this: any, ...args: any[]) => any>;
+    props?: string[] | Record<string, PropDef>;
+    hooks?: Record<string, (this: any) => void>;
+    components?: Record<string, ComponentDef>;
+    computed?: Record<string, (this: any) => any>;
+}
+
+interface PropDef {
+    type?: any;
+    default?: any;
+}
+
 // Réactivité fine-grain par instance d’application
 class MelodiReactive {
+    private _currentEffect: EffectFn | null;
+
     constructor() {
         this._currentEffect = null;
     }
-    createSignal(value) {
+    createSignal<T>(value: T): [SignalRead<T>, SignalWrite<T>] {
         let v = value;
-        const subscribers = new Set();
+        const subscribers = new Set<EffectFn>();
         const self = this;
-        function read() {
+        function read(): T {
             if (self._currentEffect) subscribers.add(self._currentEffect);
             return v;
         }
-        function write(next) {
+        function write(next: T): void {
             if (v === next) return;
             v = next;
-            subscribers.forEach(fn => fn());
+            subscribers.forEach(fn => {
+                if (typeof fn === 'function') fn();
+            });
         }
         return [read, write];
     }
-    createEffect(fn) {
+    createEffect(fn: EffectFn): CleanupFn {
         const self = this;
         function effect() {
             self._currentEffect = effect;
@@ -37,13 +66,13 @@ class MelodiReactive {
         }
     }
     // Improved createEffect with cleanup support
-    createEffectWithCleanup(fn) {
+    createEffectWithCleanup(fn: () => CleanupFn | void): CleanupFn {
         const self = this;
-        let cleanup = null;
+        let cleanup: CleanupFn | null | void = null;
         const execute = () => {
             self._currentEffect = execute;
             try {
-                if (cleanup) cleanup();
+                if (cleanup && typeof cleanup === 'function') cleanup();
                 cleanup = fn();
             } finally {
                 self._currentEffect = null;
@@ -51,12 +80,12 @@ class MelodiReactive {
         };
         execute();
         return () => {
-            if (cleanup) cleanup();
+            if (cleanup && typeof cleanup === 'function') cleanup();
         }
     }
 
-    createMemo(fn) {
-        const [read, write] = this.createSignal();
+    createMemo<T>(fn: () => T): SignalRead<T> {
+        const [read, write] = this.createSignal<T>(undefined as unknown as T);
         this.createEffect(() => {
             write(fn());
         });
@@ -67,7 +96,14 @@ class MelodiReactive {
 // Minimal reactive component library (tiny Vue-like)
 
 class MelodiJS {
-    constructor(options) {
+    options: MelodiOptions;
+    root: Element | null;
+    components: Record<string, ComponentDef>;
+    _mountedComponents: Component[];
+    reactivity: MelodiReactive;
+    store: any;
+
+    constructor(options: MelodiOptions) {
         this.options = options || {}
         this.root = null
         this.components = this.options.components || {}
@@ -77,20 +113,21 @@ class MelodiJS {
         this.store = this._makeReactiveStore(this.options.store || {})
     }
 
-    mount(target) {
+    mount(target: string | Element): Promise<any[]> {
         this.root = typeof target === 'string' ? document.querySelector(target) : target
         if (!this.root) throw new Error('Mount target not found')
 
-        const promises = []
+        const promises: Promise<any>[] = []
         const tags = Object.keys(this.components)
         Object.keys(this.components).forEach(tag => {
+            if (!this.root) return;
             const nodes = Array.from(this.root.querySelectorAll(tag))
             nodes.forEach(node => {
-                if (node.__melodijs_mounted) return
+                if ((node as any).__melodijs_mounted) return
                 if (this._isDescendantOfCustom(node, tags)) return
                 const compDef = this.components[tag]
                 const comp = new Component(compDef)
-                const p = comp.mount(node, this).then(() => { node.__melodijs_mounted = true })
+                const p = comp.mount(node, this).then(() => { (node as any).__melodijs_mounted = true })
                 promises.push(p)
             })
         })
@@ -98,7 +135,7 @@ class MelodiJS {
         return Promise.all(promises)
     }
 
-    _isDescendantOfCustom(node, customTags) {
+    _isDescendantOfCustom(node: Element, customTags: string[]): boolean {
         let p = node.parentElement
         while (p) {
             const tag = p.tagName && p.tagName.toLowerCase()
@@ -108,9 +145,9 @@ class MelodiJS {
         return false
     }
 
-    _makeReactiveStore(initial) {
+    _makeReactiveStore(initial: Record<string, any>): any {
         // Use the same logic as Component._makeReactive but for the store
-        const state = {};
+        const state: any = {};
         for (const key of Object.keys(initial)) {
             const [getter, setter] = this.reactivity.createSignal(initial[key]);
             Object.defineProperty(state, key, {
@@ -125,7 +162,29 @@ class MelodiJS {
 }
 
 class Component {
-    constructor(def) {
+    template: string | { el?: string; url?: string };
+    dataFn: (this: any) => Record<string, any>;
+    methodsDef: Record<string, (this: any, ...args: any[]) => any>;
+    propsDef: string[] | Record<string, PropDef> | null;
+    hooks: Record<string, (this: any) => void>;
+    components: Record<string, ComponentDef>;
+    computedDef: Record<string, (this: any) => any>;
+
+    el: Element | null;
+    app: MelodiJS | null;
+    state: any;
+    methods: Record<string, Function>;
+    _listeners: { node: Element; ev: string; fn: EventListener }[];
+    _effects: CleanupFn[]; // Track effects for cleanup
+    _events: Record<string, Function[]>;
+    _slotSource: Element | null = null;
+    _fragment: DocumentFragment | null = null;
+    _postMountEffects: (() => void)[] = [];
+    _signals: Record<string, [SignalRead<any>, SignalWrite<any>]> = {};
+    reactivity: MelodiReactive | null = null;
+    _parent: Component | null = null;
+
+    constructor(def: ComponentDef) {
         this.template = def.template || ''
         this.dataFn = def.data || function () { return {} }
         this.methodsDef = def.methods || {}
@@ -145,7 +204,7 @@ class Component {
         this._events = {}
     }
 
-    mount(el, app) {
+    mount(el: Element, app: MelodiJS): Promise<boolean> {
         this.el = el
         this.app = app
         try { console.debug && console.debug('Component.mount start for', el && el.tagName) } catch (e) { }
@@ -193,7 +252,7 @@ class Component {
         try {
             const comp = this
             // register event listener on this component
-            this.state.$on = function (eventName, handler) {
+            this.state.$on = function (eventName: string, handler: Function) {
                 if (!eventName || typeof handler !== 'function') return
                 comp._events[eventName] = comp._events[eventName] || []
                 comp._events[eventName].push(handler)
@@ -205,15 +264,15 @@ class Component {
                 }
             }
             // emit event: call local handlers, then bubble up to ancestor components
-            this.state.$emit = function (eventName, payload) {
+            this.state.$emit = function (eventName: string, payload: any) {
                 try {
                     const local = comp._events[eventName] || []
                     local.forEach(h => { try { h.call(comp.state, payload) } catch (e) { } })
                     // bubble
                     // first try DOM parent chain
-                    let p = comp.el.parentElement
+                    let p = comp.el!.parentElement
                     while (p) {
-                        const parentComp = p.__melodijs_instance
+                        const parentComp = (p as any).__melodijs_instance as Component
                         if (parentComp) {
                             const handlers = parentComp._events[eventName] || []
                             handlers.forEach(h => { try { h.call(parentComp.state, payload) } catch (e) { } })
@@ -226,7 +285,7 @@ class Component {
                         let lp = comp._parent
                         while (lp) {
                             const handlers = lp._events[eventName] || []
-                            handlers.forEach(h => { try { h.call(lp.state, payload) } catch (e) { } })
+                            handlers.forEach(h => { try { h.call(lp!.state, payload) } catch (e) { } })
                             lp = lp._parent
                         }
                     } catch (e) { }
@@ -243,7 +302,7 @@ class Component {
             })
             // expose methods directly on state so methods can call each other via `this.someMethod()`
             Object.keys(this.methods).forEach(name => {
-                try { this.state[name] = this.methods[name] } catch(e){}
+                try { this.state[name] = this.methods[name] } catch (e) { }
             })
         } catch (e) {
             console.error('Error binding methods:', e)
@@ -254,14 +313,14 @@ class Component {
         app._mountedComponents.push(this)
 
         // mark instance on element for parent-child lookup
-        try { this.el.__melodijs_instance = this } catch (e) { }
+        try { (this.el as any).__melodijs_instance = this } catch (e) { }
 
         // initial render (handle async template resolution)
         return this._render(true)
     }
 
-    _readPropsFromEl(el) {
-        const props = {}
+    _readPropsFromEl(el: Element): Record<string, any> {
+        const props: Record<string, any> = {}
         Array.from(el.attributes).forEach(attr => {
             // ignore special attributes
             if (/^v-|^@|^:/.test(attr.name)) return
@@ -279,19 +338,19 @@ class Component {
         return props
     }
 
-    _coerceAttrValue(val) {
+    _coerceAttrValue(val: string): any {
         // try number and boolean coercion
         if (val === 'true') return true
         if (val === 'false') return false
-        if (!isNaN(val) && val.trim() !== '') return Number(val)
+        if (!isNaN(val as any) && val.trim() !== '') return Number(val)
         return val
     }
 
-    _gatherDeclaredProps() {
+    _gatherDeclaredProps(): Record<string, PropDef> | null {
         // returns an object map of propName -> def (if array provided, returns names with undefined defs)
         if (!this.propsDef) return null
         if (Array.isArray(this.propsDef)) {
-            const out = {}
+            const out: Record<string, PropDef> = {}
             this.propsDef.forEach(n => out[n] = {})
             return out
         }
@@ -299,7 +358,7 @@ class Component {
         return this.propsDef
     }
 
-    _coercePropValue(val, def) {
+    _coercePropValue(val: any, def: PropDef): any {
         if (!def || !def.type) return val
         const t = def.type
         if (t === Number) return Number(val)
@@ -309,9 +368,10 @@ class Component {
     }
 
     // Fine-grain reactivity: wrap each property in a signal
-    _makeReactive(obj) {
-        const state = {};
+    _makeReactive(obj: any): any {
+        const state: any = {};
         this._signals = {};
+        if (!this.reactivity) return state; // Should not happen
         for (const key of Object.keys(obj)) {
             const [getter, setter] = this.reactivity.createSignal(obj[key]);
             Object.defineProperty(state, key, {
@@ -327,7 +387,7 @@ class Component {
         if (this.computedDef) {
             Object.keys(this.computedDef).forEach(key => {
                 const fn = this.computedDef[key].bind(state);
-                const memo = this.reactivity.createMemo(fn);
+                const memo = this.reactivity!.createMemo(fn);
                 Object.defineProperty(state, key, {
                     get: memo,
                     enumerable: true,
@@ -339,7 +399,7 @@ class Component {
         return state;
     }
 
-    _evalExpression(expr, scope) {
+    _evalExpression(expr: string, scope: any): any {
         // Evaluate JS expressions with access to state (getters on `this.state` will register effects)
         try {
             if (!expr || typeof expr !== 'string') return '';
@@ -354,7 +414,7 @@ class Component {
 
     // --- Fine-grained DOM Creation & Update ---
 
-    async _render(isInitial) {
+    async _render(isInitial: boolean): Promise<boolean> {
         if (isInitial) {
             this._postMountEffects = []; // Queue for effects that need parentNode
 
@@ -365,7 +425,9 @@ class Component {
             try { if (typeof this.hooks.beforeMount === 'function') this.hooks.beforeMount.call(this.state); } catch (e) { }
 
             // 3. Append to DOM
-            this.el.appendChild(this._fragment);
+            if (this.el && this._fragment) {
+                this.el.appendChild(this._fragment);
+            }
 
             // 4. Run post-mount effects (v-if, v-for) now that parentNodes exist
             this._postMountEffects.forEach(fn => fn());
@@ -379,24 +441,26 @@ class Component {
         return true;
     }
 
-    async _compile() {
+    async _compile(): Promise<void> {
         // Get template string
-        let tpl = this.template;
-        let tempDiv;
+        let tpl: string | { el?: string; url?: string } = this.template;
+        let tempDiv: HTMLDivElement;
 
         if (!tpl) {
             // If no template, use the element's initial HTML (but clear it first)
             // We clone the nodes to a fragment to process them
             const fragment = document.createDocumentFragment();
-            while (this.el.firstChild) {
-                fragment.appendChild(this.el.firstChild);
+            if (this.el) {
+                while (this.el.firstChild) {
+                    fragment.appendChild(this.el.firstChild);
+                }
             }
             // If no template provided, the "slot source" IS the template effectively, 
             // but usually components have a template. 
             // If we are here, it means we are using the innerHTML as the template.
             // In this case, slots don't make much sense unless we are a higher-order component?
             // Actually, if no template is defined, we treat the content as the template.
-            this._fragment = this._processNodeList(fragment.childNodes);
+            this._fragment = this._processNodeList(Array.from(fragment.childNodes));
         } else {
             // If template string provided
             if (typeof tpl === 'object') {
@@ -412,7 +476,7 @@ class Component {
             }
 
             tempDiv = document.createElement('div');
-            tempDiv.innerHTML = tpl || '';
+            tempDiv.innerHTML = (tpl as string) || '';
 
             // --- Slot Distribution ---
             if (this._slotSource) {
@@ -424,15 +488,15 @@ class Component {
 
                     if (name) {
                         // Named slot
-                        const nodes = Array.from(this._slotSource.querySelectorAll('[slot="' + name + '"]'));
+                        const nodes = Array.from(this._slotSource!.querySelectorAll('[slot="' + name + '"]'));
                         if (nodes.length) {
                             nodes.forEach(n => fragment.appendChild(n.cloneNode(true)));
                             inserted = true;
                         }
                     } else {
                         // Default slot
-                        const nodes = Array.from(this._slotSource.childNodes).filter(n => {
-                            return !(n.nodeType === 1 && n.hasAttribute && n.hasAttribute('slot'));
+                        const nodes = Array.from(this._slotSource!.childNodes).filter(n => {
+                            return !(n.nodeType === 1 && (n as Element).hasAttribute && (n as Element).hasAttribute('slot'));
                         });
                         if (nodes.length) {
                             nodes.forEach(n => fragment.appendChild(n.cloneNode(true)));
@@ -441,25 +505,25 @@ class Component {
                     }
 
                     if (inserted) {
-                        slotEl.parentNode.replaceChild(fragment, slotEl);
+                        if (slotEl.parentNode) slotEl.parentNode.replaceChild(fragment, slotEl);
                     } else {
                         // Fallback content: keep what's inside the slot tag, but unwrap the slot tag itself?
                         // Usually <slot>fallback</slot> -> fallback
                         // We need to replace <slot> with its children.
                         while (slotEl.firstChild) {
-                            slotEl.parentNode.insertBefore(slotEl.firstChild, slotEl);
+                            if (slotEl.parentNode) slotEl.parentNode.insertBefore(slotEl.firstChild, slotEl);
                         }
-                        slotEl.parentNode.removeChild(slotEl);
+                        if (slotEl.parentNode) slotEl.parentNode.removeChild(slotEl);
                     }
                 });
             }
 
-            this._fragment = this._processNodeList(tempDiv.childNodes);
-            this.el.innerHTML = ''; // Clear host element
+            this._fragment = this._processNodeList(Array.from(tempDiv.childNodes));
+            if (this.el) this.el.innerHTML = ''; // Clear host element
         }
     }
 
-    _processNodeList(nodes, scope = {}) {
+    _processNodeList(nodes: NodeListOf<ChildNode> | Node[], scope: any = {}): DocumentFragment {
         const fragment = document.createDocumentFragment();
         Array.from(nodes).forEach(node => {
             const processed = this._walk(node, scope);
@@ -472,10 +536,10 @@ class Component {
         return fragment;
     }
 
-    _walk(node, scope) {
+    _walk(node: Node, scope: any): Node | DocumentFragment {
         // 1. Handle Text Nodes (Interpolation)
         if (node.nodeType === 3) {
-            const text = node.nodeValue;
+            const text = node.nodeValue || '';
             if (text.trim() === '') return node.cloneNode(true);
 
             const parts = text.split(/(\{\{[^}]+\}\})/g);
@@ -502,29 +566,30 @@ class Component {
 
         // 2. Handle Elements
         if (node.nodeType === 1) {
+            const elNode = node as Element;
             // Check for v-pre
-            if (node.hasAttribute('v-pre')) {
-                const clone = node.cloneNode(true);
+            if (elNode.hasAttribute('v-pre')) {
+                const clone = elNode.cloneNode(true) as Element;
                 clone.removeAttribute('v-pre');
                 return clone;
             }
 
             // Check for v-if
-            if (node.hasAttribute('v-if')) {
-                return this._handleVIf(node, scope);
+            if (elNode.hasAttribute('v-if')) {
+                return this._handleVIf(elNode, scope);
             }
 
             // Check for v-for
-            if (node.hasAttribute('v-for')) {
-                return this._handleVFor(node, scope);
+            if (elNode.hasAttribute('v-for')) {
+                return this._handleVFor(elNode, scope);
             }
 
             // Clone element
-            const el = node.cloneNode(false);
+            const el = elNode.cloneNode(false) as HTMLElement;
 
             // Handle v-show
             if (el.hasAttribute('v-show')) {
-                const expr = el.getAttribute('v-show');
+                const expr = el.getAttribute('v-show')!;
                 el.removeAttribute('v-show');
                 this._createEffect(() => {
                     const show = !!this._evalExpression(expr, scope);
@@ -534,29 +599,30 @@ class Component {
 
             // Handle v-model
             if (el.hasAttribute('v-model')) {
-                const prop = el.getAttribute('v-model').trim();
+                const prop = el.getAttribute('v-model')!.trim();
                 el.removeAttribute('v-model');
 
                 if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT') {
+                    const inputEl = el as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement;
                     // Two-way binding
                     // 1. Model -> View
                     this._createEffect(() => {
                         const val = this.state[prop];
-                        if (el.type === 'checkbox') {
-                            el.checked = !!val;
+                        if (inputEl.type === 'checkbox') {
+                            (inputEl as HTMLInputElement).checked = !!val;
                         } else {
-                            el.value = (val == null) ? '' : val;
+                            inputEl.value = (val == null) ? '' : val;
                         }
                     });
 
                     // 2. View -> Model
-                    const handler = (e) => {
-                        const val = el.type === 'checkbox' ? el.checked : el.value;
+                    const handler = (e: Event) => {
+                        const val = (inputEl.type === 'checkbox') ? (inputEl as HTMLInputElement).checked : inputEl.value;
                         this.state[prop] = val;
                     };
                     el.addEventListener('input', handler);
                     // Also listen to change for some inputs
-                    if (el.tagName === 'SELECT' || el.type === 'checkbox' || el.type === 'radio') {
+                    if (el.tagName === 'SELECT' || (inputEl as HTMLInputElement).type === 'checkbox' || (inputEl as HTMLInputElement).type === 'radio') {
                         el.addEventListener('change', handler);
                     }
                     this._listeners.push({ node: el, ev: 'input', fn: handler });
@@ -564,7 +630,7 @@ class Component {
             }
 
             // Handle Attributes & Events
-            Array.from(node.attributes).forEach(attr => {
+            Array.from(elNode.attributes).forEach(attr => {
                 const name = attr.name;
                 const value = attr.value;
 
@@ -574,7 +640,7 @@ class Component {
                     el.removeAttribute(name);
                     const handlerName = value.trim();
 
-                    const handlerFn = (e) => {
+                    const handlerFn = (e: Event) => {
                         // Try to find method first (simple name like "increment")
                         if (this.methods[handlerName]) {
                             this.methods[handlerName](e);
@@ -623,7 +689,7 @@ class Component {
             });
 
             // Process children
-            const childrenFrag = this._processNodeList(node.childNodes, scope);
+            const childrenFrag = this._processNodeList(Array.from(elNode.childNodes), scope);
             el.appendChild(childrenFrag);
 
             return el;
@@ -632,10 +698,10 @@ class Component {
         return node.cloneNode(true);
     }
 
-    _handleVIf(node, scope) {
+    _handleVIf(node: Element, scope: any): Comment {
         const anchor = document.createComment('v-if');
-        const expr = node.getAttribute('v-if');
-        let currentEl = null;
+        const expr = node.getAttribute('v-if')!;
+        let currentEl: Node | null = null;
 
         // Defer the effect until mount so anchor has a parent
         const effectFn = () => {
@@ -643,7 +709,7 @@ class Component {
                 const shouldShow = !!this._evalExpression(expr, scope);
                 if (shouldShow) {
                     if (!currentEl) {
-                        const clone = node.cloneNode(true);
+                        const clone = node.cloneNode(true) as Element;
                         clone.removeAttribute('v-if');
                         // We must process the new node
                         // Note: _walk might return a Fragment if the node itself had v-if (recursion?) 
@@ -687,13 +753,13 @@ class Component {
         return anchor;
     }
 
-    _handleVFor(node, scope) {
+    _handleVFor(node: Element, scope: any): Comment {
         const anchor = document.createComment('v-for');
-        const expr = node.getAttribute('v-for');
+        const expr = node.getAttribute('v-for')!;
         const inMatch = expr.match(/^\s*(?:\(([^,]+)\s*,\s*([^\)]+)\)|([^\s]+))\s+in\s+(.+)$/);
         if (!inMatch) return anchor;
 
-        let itemName, indexName, listExpr;
+        let itemName: string, indexName: string | undefined, listExpr: string;
         if (inMatch[1]) { itemName = inMatch[1].trim(); indexName = inMatch[2].trim(); listExpr = inMatch[4].trim() }
         else { itemName = inMatch[3].trim(); listExpr = inMatch[4].trim() }
 
@@ -702,7 +768,7 @@ class Component {
         const hasKey = !!keyExpr;
 
         // Map to track items by key: key -> { element, item, index }
-        let itemMap = new Map();
+        let itemMap = new Map<any, { element: Node; item: any; index: any; scope?: any }>();
 
         const effectFn = () => {
             this._createEffect(() => {
@@ -717,12 +783,12 @@ class Component {
                     });
                     itemMap.clear();
 
-                    const renderItem = (item, index) => {
+                    const renderItem = (item: any, index: any) => {
                         const newScope = Object.assign({}, scope);
                         newScope[itemName] = item;
                         if (indexName) newScope[indexName] = index;
 
-                        const clone = node.cloneNode(true);
+                        const clone = node.cloneNode(true) as Element;
                         clone.removeAttribute('v-for');
                         clone.removeAttribute(':key');
                         clone.removeAttribute('v-bind:key');
@@ -748,12 +814,12 @@ class Component {
                     if (Array.isArray(list)) {
                         list.forEach((item, i) => renderItem(item, i));
                     } else if (typeof list === 'object' && list !== null) {
-                        Object.keys(list).forEach((key, i) => renderItem(list[key], key));
+                        Object.keys(list).forEach((key: any, i) => renderItem(list[key], key));
                     }
                 } else {
                     // Optimized: :key specified - use diffing algorithm
-                    const newItemMap = new Map();
-                    const newKeys = [];
+                    const newItemMap = new Map<any, { item: any; index: any; scope: any }>();
+                    const newKeys: any[] = [];
 
                     // Build new item map
                     if (Array.isArray(list)) {
@@ -762,7 +828,7 @@ class Component {
                             newScope[itemName] = item;
                             if (indexName) newScope[indexName] = i;
 
-                            const key = this._evalExpression(keyExpr, newScope);
+                            const key = this._evalExpression(keyExpr!, newScope);
                             if (key === null || key === undefined) {
                                 console.warn('v-for :key evaluated to null/undefined for item:', item);
                                 return;
@@ -776,13 +842,13 @@ class Component {
                             newItemMap.set(key, { item, index: i, scope: newScope });
                         });
                     } else if (typeof list === 'object' && list !== null) {
-                        Object.keys(list).forEach((objKey, i) => {
+                        Object.keys(list).forEach((objKey: any, i) => {
                             const item = list[objKey];
                             const newScope = Object.assign({}, scope);
                             newScope[itemName] = item;
                             if (indexName) newScope[indexName] = objKey;
 
-                            const key = this._evalExpression(keyExpr, newScope);
+                            const key = this._evalExpression(keyExpr!, newScope);
                             if (key === null || key === undefined) {
                                 console.warn('v-for :key evaluated to null/undefined for item:', item);
                                 return;
@@ -800,11 +866,11 @@ class Component {
                     // Diff algorithm: reuse, move, add, remove
                     const oldKeys = Array.from(itemMap.keys());
                     const keysToRemove = oldKeys.filter(k => !newItemMap.has(k));
-                    const keysToAdd = newKeys.filter(k => !itemMap.has(k));
+                    // const keysToAdd = newKeys.filter(k => !itemMap.has(k)); // Unused
 
                     // Remove old items
                     keysToRemove.forEach(key => {
-                        const { element } = itemMap.get(key);
+                        const { element } = itemMap.get(key)!;
                         if (element && element.parentNode) {
                             element.parentNode.removeChild(element);
                         }
@@ -812,13 +878,13 @@ class Component {
                     });
 
                     // Process new items in order
-                    let previousElement = null;
+                    let previousElement: Node | null = null;
                     newKeys.forEach((key, i) => {
-                        const newData = newItemMap.get(key);
+                        const newData = newItemMap.get(key)!;
 
                         if (itemMap.has(key)) {
                             // Reuse existing element
-                            const { element } = itemMap.get(key);
+                            const { element } = itemMap.get(key)!;
 
                             // Move element to correct position if needed
                             // Insert after previousElement (or at start if previousElement is null)
@@ -838,14 +904,14 @@ class Component {
                             previousElement = element;
                         } else {
                             // Create new element
-                            const clone = node.cloneNode(true);
+                            const clone = node.cloneNode(true) as Element;
                             clone.removeAttribute('v-for');
                             clone.removeAttribute(':key');
                             clone.removeAttribute('v-bind:key');
 
                             const processed = this._walk(clone, newData.scope);
 
-                            let elementToTrack;
+                            let elementToTrack: Node;
                             if (processed.nodeType === 11) {
                                 // Fragment - insert all children
                                 const children = Array.from(processed.childNodes);
@@ -881,7 +947,7 @@ class Component {
         return anchor;
     }
 
-    _escape(v) {
+    _escape(v: any): string {
         if (v == null) return ''
         return String(v)
             .replace(/&/g, '&amp;')
@@ -891,8 +957,9 @@ class Component {
             .replace(/'/g, '&#39;')
     }
 
-    _bindEvents() {
+    _bindEvents(): void {
         const el = this.el
+        if (!el) return;
         // find elements with attributes starting with data-on-
         const all = el.querySelectorAll('[data-on-click], [data-on-input], [data-on-change], [data-on-submit]')
         all.forEach(node => {
@@ -903,7 +970,7 @@ class Component {
                 if (!handler) return
                 const fn = this.methods[handler]
                 if (typeof fn === 'function') {
-                    const bound = (e) => { fn(e) }
+                    const bound = (e: Event) => { fn(e) }
                     node.addEventListener(ev, bound)
                     this._listeners.push({ node, ev, fn: bound })
                 }
@@ -911,37 +978,40 @@ class Component {
         })
     }
 
-    _bindModels() {
+    _bindModels(): void {
         const el = this.el;
+        if (!el) return;
         const nodes = el.querySelectorAll('[data-model]');
         nodes.forEach(node => {
-            const prop = node.getAttribute('data-model').trim();
+            const prop = node.getAttribute('data-model')!.trim();
             if (!prop) return;
             if (node.tagName === 'INPUT' || node.tagName === 'TEXTAREA' || node.tagName === 'SELECT') {
+                const inputEl = node as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement;
                 const updateInput = () => {
-                    if (node.type === 'checkbox') {
-                        node.checked = !!this.state[prop];
+                    if (inputEl.type === 'checkbox') {
+                        (inputEl as HTMLInputElement).checked = !!this.state[prop];
                     } else {
-                        node.value = this.state[prop] == null ? '' : this.state[prop];
+                        inputEl.value = this.state[prop] == null ? '' : this.state[prop];
                     }
                 };
                 this._createEffect(updateInput);
-                const bound = (e) => {
-                    const val = node.type === 'checkbox' ? node.checked : node.value;
+                const bound = (e: Event) => {
+                    const val = (inputEl.type === 'checkbox') ? (inputEl as HTMLInputElement).checked : inputEl.value;
                     this.state[prop] = val;
                 };
                 node.addEventListener('input', bound);
                 this._listeners.push({ node, ev: 'input', fn: bound });
             } else {
+                const htmlEl = node as HTMLElement;
                 const updateText = () => {
-                    node.innerText = this.state[prop] == null ? '' : this.state[prop];
+                    htmlEl.innerText = this.state[prop] == null ? '' : this.state[prop];
                 };
                 this._createEffect(updateText);
             }
         });
     }
 
-    unmount() {
+    unmount(): void {
         // call unmounted hook
         try { if (typeof this.hooks.unmounted === 'function') this.hooks.unmounted.call(this.state) } catch (e) { }
 
@@ -964,16 +1034,16 @@ class Component {
         } catch (e) { }
 
         // unmark DOM
-        try { if (this.el) { this.el.__melodijs_mounted = false; this.el.innerHTML = '' } } catch (e) { }
+        try { if (this.el) { (this.el as any).__melodijs_mounted = false; this.el.innerHTML = '' } } catch (e) { }
     }
 
-    async _mountNestedComponents() {
-        if (!this.app || !this.app.components) return
+    async _mountNestedComponents(): Promise<void> {
+        if (!this.app || !this.app.components || !this.el) return
         const tags = Object.keys(this.app.components)
         for (const tag of tags) {
-            const nodes = Array.from(this.el.querySelectorAll(tag))
+            const nodes: Element[] = Array.from(this.el.querySelectorAll(tag))
             for (const node of nodes) {
-                if (node.__melodijs_mounted) continue
+                if ((node as any).__melodijs_mounted) continue
 
                 // Check if this node is inside another custom element that is NOT yet mounted
                 // We want to skip it only if it's inside an UNMOUNTED custom element
@@ -985,7 +1055,7 @@ class Component {
                     if (t && tags.indexOf(t) !== -1) {
                         // Found a custom element parent
                         // Skip only if it's NOT mounted yet
-                        if (!parent.__melodijs_mounted) {
+                        if (!(parent as any).__melodijs_mounted) {
                             skip = true
                             break
                         }
@@ -1001,8 +1071,8 @@ class Component {
                 // set logical parent so events can bubble even if DOM structure differs
                 try { comp._parent = this } catch (e) { }
                 try {
-                    await comp.mount(node, this.app)
-                    node.__melodijs_mounted = true
+                    await comp.mount(node, this.app);
+                    (node as any).__melodijs_mounted = true
                 } catch (e) {
                     console.error('Error mounting nested component:', tag, e)
                 }
@@ -1011,15 +1081,15 @@ class Component {
     }
 
 
-    _createEffect(fn) {
-        const cleanup = this.reactivity.createEffect(fn)
+    _createEffect(fn: EffectFn): CleanupFn {
+        const cleanup = this.reactivity!.createEffect(fn)
         if (typeof cleanup === 'function') this._effects.push(cleanup)
         return cleanup
     }
 }
 
 // small helper to create app (Vue-like)
-function createApp(options) {
+function createApp(options: MelodiOptions): MelodiJS {
     return new MelodiJS(options)
 }
 

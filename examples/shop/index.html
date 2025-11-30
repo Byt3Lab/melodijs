@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MeloShop - Boutique de Vêtements</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+</head>
+
+<body>
+    <div id="app">
+        <header class="header">
+            <div class="container">
+                <router-link to="/" class="logo">🛍️ MeloShop</router-link>
+                <nav class="nav">
+                    <router-link to="/">Accueil</router-link>
+                    <router-link to="/products">Produits</router-link>
+                    <router-link to="/cart" class="cart-link">
+                        🛒 Panier
+                        <span v-if="$store.getters.cartItemsCount > 0" class="badge">
+                            {{ $store.getters.cartItemsCount }}
+                        </span>
+                    </router-link>
+                </nav>
+            </div>
+        </header>
+
+        <main class="main">
+            <!-- Modal -->
+            <div v-if="modal.show" class="modal-overlay" @click="closeModal">
+                <div class="modal-content" @click.stop>
+                    <span class="modal-icon">✅</span>
+                    <h3 class="modal-title">Ajouté au panier !</h3>
+                    <p class="modal-message">
+                        <strong>{{ modal.productName }}</strong> a été ajouté à votre panier.
+                    </p>
+                    <div class="modal-actions">
+                        <button @click="goToCart" class="btn btn-primary btn-full">Voir le panier ({{
+                            $store.getters.cartTotal.toFixed(2) }}€)</button>
+                        <button @click="closeModal" class="btn btn-secondary btn-full">Continuer mes achats</button>
+                    </div>
+                </div>
+            </div>
+
+            <transition name="fade">
+                <router-view></router-view>
+            </transition>
+        </main>
+
+        <footer class="footer">
+            <div class="container">
+                <p>&copy; 2024 MeloShop - Powered by MelodiJS</p>
+            </div>
+        </footer>
+    </div>
+
+    <script type="module">
+        import { createApp } from '../../dist/melodijs.js';
+        import { MelodiRouter } from '../../dist/router.js';
+        import { MelodiStore } from '../../dist/store.js';
+        import { products, categories } from './products.js';
+
+        const store = new MelodiStore({
+            state: () => ({ cart: [], products: products }),
+            actions: {
+                addToCart(product) {
+                    const item = this.state.cart.find(i => i.id === product.id);
+                    if (item) item.quantity++;
+                    else this.state.cart.push({ ...product, quantity: 1 });
+                },
+                removeFromCart(productId) {
+                    const idx = this.state.cart.findIndex(i => i.id === productId);
+                    if (idx !== -1) this.state.cart.splice(idx, 1);
+                },
+                updateQuantity(productId, qty) {
+                    const item = this.state.cart.find(i => i.id === productId);
+                    if (item) {
+                        if (qty <= 0) this.dispatch('removeFromCart', productId);
+                        else item.quantity = qty;
+                    }
+                },
+                clearCart() { this.state.cart = []; }
+            },
+            getters: {
+                cartItemsCount: (s) => s.cart.reduce((t, i) => t + i.quantity, 0),
+                cartTotal: (s) => s.cart.reduce((t, i) => t + (i.price * i.quantity), 0)
+            }
+        });
+
+        // Global modal function
+        window.showCartModal = function (productName) {
+            const event = new CustomEvent('open-cart-modal', { detail: { productName } });
+            window.dispatchEvent(event);
+        };
+
+        const Home = {
+            template: `
+                <div class="home">
+                    <div class="hero">
+                        <h1>Bienvenue chez MeloShop</h1>
+                        <p>Découvrez notre collection de vêtements tendance</p>
+                        <router-link to="/products" class="btn btn-primary">Découvrir la collection</router-link>
+                    </div>
+                    <div class="features">
+                        <div class="feature">
+                            <div class="feature-icon">✨</div>
+                            <h3>Qualité Premium</h3>
+                            <p>Des vêtements de haute qualité pour tous les styles</p>
+                        </div>
+                        <div class="feature">
+                            <div class="feature-icon">🚚</div>
+                            <h3>Livraison Rapide</h3>
+                            <p>Livraison gratuite à partir de 50€</p>
+                        </div>
+                        <div class="feature">
+                            <div class="feature-icon">↩️</div>
+                            <h3>Retours Faciles</h3>
+                            <p>30 jours pour changer d'avis</p>
+                        </div>
+                    </div>
+                </div>
+            `
+        };
+
+        const Products = {
+            data: () => ({ selectedCategory: 'all', searchQuery: '', categories }),
+            computed: {
+                filteredProducts() {
+                    let f = this.$store.state.products;
+                    if (this.selectedCategory !== 'all') f = f.filter(p => p.category === this.selectedCategory);
+                    if (this.searchQuery) {
+                        const q = this.searchQuery.toLowerCase();
+                        f = f.filter(p => p.name.toLowerCase().includes(q) || p.description.toLowerCase().includes(q));
+                    }
+                    return f;
+                }
+            },
+            methods: {
+                viewProduct(id) { window.location.hash = `#/product/${id}`; }
+            },
+            template: `
+                <div class="products-page">
+                    <h1>Nos Produits</h1>
+                    <div class="filters">
+                        <div class="search-box">
+                            <input v-model="searchQuery" placeholder="Rechercher..." class="search-input"/>
+                        </div>
+                        <div class="category-filters">
+                            <button v-for="cat in categories" :key="cat.id" @click="selectedCategory = cat.id" :class="{btn: true, 'btn-secondary': selectedCategory !== cat.id, 'btn-primary': selectedCategory === cat.id}">
+                                {{cat.name}}
+                            </button>
+                        </div>
+                    </div>
+                    <div v-if="filteredProducts.length === 0" class="no-products">Aucun produit trouvé</div>
+                    <div class="product-grid">
+                        <div v-for="p in filteredProducts" :key="p.id" class="product-card" @click="viewProduct(p.id)">
+                            <img :src="p.image" :alt="p.name" class="product-image">
+                            <div class="product-info">
+                                <h3>{{p.name}}</h3>
+                                <p class="product-description">{{p.description}}</p>
+                                <div class="product-footer">
+                                    <span class="price">{{p.price.toFixed(2)}}€</span>
+                                    <span class="view-details">Voir détails →</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `
+        };
+
+        const ProductDetail = {
+            data: () => ({ quantity: 1 }),
+            computed: {
+                productId() { return this.$router.params().id; },
+                product() { return this.$store.state.products.find(p => p.id === parseInt(this.productId)); }
+            },
+            methods: {
+                addToCart() {
+                    if (this.product) {
+                        for (let i = 0; i < this.quantity; i++) {
+                            this.$store.dispatch('addToCart', this.product);
+                        }
+                        alert("product add to cart name: " + this.product.name)
+                    }
+                },
+                goBack() { window.location.hash = '#/products'; }
+            },
+            template: `
+                <div class="product-detail">
+                    <button @click="goBack" class="back-btn">← Retour aux produits</button>
+                    <div v-if="!product" class="not-found">
+                        <h2>Produit non trouvé</h2>
+                        <button @click="goBack" class="btn btn-primary">Retour</button>
+                    </div>
+                    <div v-else class="detail-container">
+                        <div class="detail-image">
+                            <img :src="product.image" :alt="product.name">
+                        </div>
+                        <div class="detail-info">
+                            <h1>{{product.name}}</h1>
+                            <p class="detail-price">{{product.price.toFixed(2)}}€</p>
+                            <p class="detail-description">{{product.description}}</p>
+                            <div class="detail-quantity">
+                                <label>Quantité:</label>
+                                <div class="quantity-selector">
+                                    <button @click="quantity = Math.max(1, quantity - 1)" class="qty-btn">-</button>
+                                    <span>{{quantity}}</span>
+                                    <button @click="quantity++" class="qty-btn">+</button>
+                                </div>
+                            </div>
+                            <button @click="addToCart" class="btn btn-primary btn-large">Ajouter au panier</button>
+                        </div>
+                    </div>
+                </div>
+            `
+        };
+
+        const Cart = {
+            computed: {
+                cartItems() { return this.$store.state.cart; },
+                total() { return this.$store.getters.cartTotal; },
+                isEmpty() { return this.cartItems.length === 0; }
+            },
+            methods: {
+                updateQuantity(id, qty) {
+                    this.$store.dispatch('updateQuantity', id, qty);
+                },
+                removeItem(id) {
+                    this.$store.dispatch('removeFromCart', id);
+                },
+                goToCheckout() { window.location.hash = '#/checkout'; }
+            },
+            template: `
+                <div class="cart-page">
+                    <h1>Mon Panier</h1>
+                    <div v-if="isEmpty" class="empty-cart">
+                        <p>Votre panier est vide</p>
+                        <router-link to="/products" class="btn btn-primary">Continuer mes achats</router-link>
+                    </div>
+                    <div v-else>
+                        <div class="cart-items">
+                            <div v-for="i in cartItems" :key="i.id + '-' + i.quantity" class="cart-item">
+                                <img :src="i.image" :alt="i.name" class="cart-item-image">
+                                <div class="cart-item-info">
+                                    <h3>{{i.name}}</h3>
+                                    <p>{{i.price.toFixed(2)}}€</p>
+                                </div>
+                                <div class="cart-item-quantity">
+                                    <button @click="updateQuantity(i.id, i.quantity - 1)" class="qty-btn">-</button>
+                                    <span>{{i.quantity}}</span>
+                                    <button @click="updateQuantity(i.id, i.quantity + 1)" class="qty-btn">+</button>
+                                </div>
+                                <div class="cart-item-total">{{(i.price * i.quantity).toFixed(2)}}€</div>
+                                <button @click="removeItem(i.id)" class="remove-btn">✕</button>
+                            </div>
+                        </div>
+                        <div class="cart-summary">
+                            <div class="summary-row">
+                                <span>Total:</span>
+                                <strong>{{total.toFixed(2)}}€</strong>
+                            </div>
+                            <button @click="goToCheckout" class="btn btn-primary btn-large">Procéder au paiement</button>
+                        </div>
+                    </div>
+                </div>
+            `
+        };
+
+        const Checkout = {
+            data: () => ({
+                form: { name: '', email: '', address: '', city: '', zip: '', cardNumber: '' },
+                orderPlaced: false
+            }),
+            computed: {
+                total() { return this.$store.getters.cartTotal; },
+                isFormValid() {
+                    return this.form.name && this.form.email && this.form.address &&
+                        this.form.city && this.form.zip && this.form.cardNumber;
+                }
+            },
+            methods: {
+                placeOrder() {
+                    if (this.isFormValid) {
+                        this.orderPlaced = true;
+                        setTimeout(() => {
+                            this.$store.dispatch('clearCart');
+                            window.location.hash = '#/';
+                        }, 3000);
+                    }
+                }
+            },
+            template: `
+                <div class="checkout-page">
+                    <transition name="fade">
+                        <div v-if="orderPlaced" class="order-success">
+                            <h2>✅ Commande confirmée!</h2>
+                            <p>Merci pour votre achat. Vous allez être redirigé...</p>
+                        </div>
+                        <div v-else>
+                            <h1>Finaliser la commande</h1>
+                            <div class="checkout-container">
+                                <div class="checkout-form">
+                                    <h3>Informations de livraison</h3>
+                                    <input v-model="form.name" placeholder="Nom complet" class="form-input"/>
+                                    <input v-model="form.email" type="email" placeholder="Email" class="form-input"/>
+                                    <input v-model="form.address" placeholder="Adresse" class="form-input"/>
+                                    <div class="form-row">
+                                        <input v-model="form.city" placeholder="Ville" class="form-input"/>
+                                        <input v-model="form.zip" placeholder="Code postal" class="form-input"/>
+                                    </div>
+                                    <h3>Paiement</h3>
+                                    <input v-model="form.cardNumber" placeholder="Numéro de carte" class="form-input"/>
+                                </div>
+                                <div class="checkout-summary">
+                                    <h3>Résumé</h3>
+                                    <div class="summary-row">
+                                        <span>Total:</span>
+                                        <strong>{{total.toFixed(2)}}€</strong>
+                                    </div>
+                                    <button @click="placeOrder" :disabled="!isFormValid" class="btn btn-primary btn-large">
+                                        Confirmer la commande
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </transition>
+                </div>
+            `
+        };
+
+        const router = new MelodiRouter({
+            routes: [
+                { path: '/', component: Home },
+                { path: '/products', component: Products },
+                { path: '/product/:id', component: ProductDetail },
+                { path: '/cart', component: Cart },
+                { path: '/checkout', component: Checkout }
+            ]
+        });
+
+        const app = createApp({
+            data: () => ({
+                modal: { show: false, productName: '' }
+            }),
+            methods: {
+                closeModal() {
+                    this.modal.show = false;
+                },
+                goToCart() {
+                    this.modal.show = false;
+                    window.location.hash = '#/cart';
+                }
+            },
+            hooks: {
+                mounted() {
+                    // Listen for global modal events
+                    window.addEventListener('open-cart-modal', (e) => {
+                        this.modal.productName = e.detail.productName;
+                        this.modal.show = true;
+                    });
+                }
+            }
+        });
+        app.use(store);
+        app.use(router);
+        app.mount('#app');
+    </script>
+</body>
+
+</html>

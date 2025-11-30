@@ -4,13 +4,28 @@ type SignalRead<T> = () => T;
 type SignalWrite<T> = (next: T) => void;
 type EffectFn = () => void | (() => void);
 type CleanupFn = () => void;
+type WatchCallback = (this: any, newVal: any, oldVal: any) => void;
 
-interface MelodiOptions {
-    components?: Record<string, ComponentDef>;
-    store?: Record<string, any>;
+interface WatchOptions {
+    handler: WatchCallback;
+    immediate?: boolean;
+    deep?: boolean;
 }
 
-interface ComponentDef {
+export interface MelodiOptions {
+    // Legacy: component registry
+    components?: Record<string, ComponentDef>;
+    store?: Record<string, any>;
+
+    // Root component options (Vue-like)
+    data?: () => Record<string, any>;
+    methods?: Record<string, (this: any, ...args: any[]) => any>;
+    computed?: Record<string, (this: any) => any>;
+    watch?: Record<string, WatchCallback | WatchOptions>;
+    template?: string | { el?: string; url?: string };
+}
+
+export interface ComponentDef {
     template?: string | { el?: string; url?: string };
     data?: () => Record<string, any>;
     methods?: Record<string, (this: any, ...args: any[]) => any>;
@@ -18,9 +33,10 @@ interface ComponentDef {
     hooks?: Record<string, (this: any) => void>;
     components?: Record<string, ComponentDef>;
     computed?: Record<string, (this: any) => any>;
+    watch?: Record<string, WatchCallback | WatchOptions>;
 }
 
-interface PropDef {
+export interface PropDef {
     type?: any;
     default?: any;
 }
@@ -41,7 +57,11 @@ class MelodiReactive {
             return v;
         }
         function write(next: T): void {
-            if (v === next) return;
+            // For primitives, use strict equality
+            // For objects/arrays (including Proxies), always trigger to catch mutations
+            const isPrimitive = next === null || (typeof next !== 'object' && typeof next !== 'function');
+            if (isPrimitive && v === next) return;
+
             v = next;
             subscribers.forEach(fn => {
                 if (typeof fn === 'function') fn();
@@ -93,6 +113,10 @@ class MelodiReactive {
     }
 }
 
+export interface Plugin {
+    install: (app: MelodiJS, options?: any) => void;
+}
+
 // Minimal reactive component library (tiny Vue-like)
 
 class MelodiJS {
@@ -102,6 +126,7 @@ class MelodiJS {
     _mountedComponents: Component[];
     reactivity: MelodiReactive;
     store: any;
+    _plugins: Set<Plugin>;
 
     constructor(options: MelodiOptions) {
         this.options = options || {}
@@ -111,6 +136,23 @@ class MelodiJS {
         this.reactivity = new MelodiReactive();
         // Store is now fine-grained reactive
         this.store = this._makeReactiveStore(this.options.store || {})
+        this._plugins = new Set();
+
+        // Register built-in components
+        this.components['transition'] = {
+            props: ['name'],
+            template: '<div :data-melodi-transition="name"><slot></slot></div>'
+        };
+    }
+
+    use(plugin: Plugin, options?: any): this {
+        if (this._plugins.has(plugin)) {
+            console.warn('Plugin has already been installed.');
+            return this;
+        }
+        this._plugins.add(plugin);
+        plugin.install(this, options);
+        return this;
     }
 
     mount(target: string | Element): Promise<any[]> {
@@ -118,19 +160,43 @@ class MelodiJS {
         if (!this.root) throw new Error('Mount target not found')
 
         const promises: Promise<any>[] = []
-        const tags = Object.keys(this.components)
-        Object.keys(this.components).forEach(tag => {
-            if (!this.root) return;
-            const nodes = Array.from(this.root.querySelectorAll(tag))
-            nodes.forEach(node => {
-                if ((node as any).__melodijs_mounted) return
-                if (this._isDescendantOfCustom(node, tags)) return
-                const compDef = this.components[tag]
-                const comp = new Component(compDef)
-                const p = comp.mount(node, this).then(() => { (node as any).__melodijs_mounted = true })
-                promises.push(p)
+
+        // Check if this is a root component app (Vue-like)
+        const isRootComponent = !!(this.options.data || this.options.methods || this.options.computed || this.options.watch || this.options.template);
+
+        if (isRootComponent) {
+            // Create and mount a root component
+            const rootComponentDef: ComponentDef = {
+                data: this.options.data,
+                methods: this.options.methods,
+                computed: this.options.computed,
+                watch: this.options.watch,
+                template: this.options.template,
+                components: this.components  // Use this.components which includes plugin-registered components
+            };
+
+            const rootComp = new Component(rootComponentDef);
+            const p = rootComp.mount(this.root, this).then(() => {
+                (this.root as any).__melodijs_mounted = true;
+                (this.root as any).__melodijs_root = rootComp;
+            });
+            promises.push(p);
+        } else {
+            // Legacy mode: mount registered components
+            const tags = Object.keys(this.components)
+            Object.keys(this.components).forEach(tag => {
+                if (!this.root) return;
+                const nodes = Array.from(this.root.querySelectorAll(tag))
+                nodes.forEach(node => {
+                    if ((node as any).__melodijs_mounted) return
+                    if (this._isDescendantOfCustom(node, tags)) return
+                    const compDef = this.components[tag]
+                    const comp = new Component(compDef)
+                    const p = comp.mount(node, this).then(() => { (node as any).__melodijs_mounted = true })
+                    promises.push(p)
+                })
             })
-        })
+        }
 
         return Promise.all(promises)
     }
@@ -161,7 +227,7 @@ class MelodiJS {
     }
 }
 
-class Component {
+export class Component {
     template: string | { el?: string; url?: string };
     dataFn: (this: any) => Record<string, any>;
     methodsDef: Record<string, (this: any, ...args: any[]) => any>;
@@ -169,6 +235,7 @@ class Component {
     hooks: Record<string, (this: any) => void>;
     components: Record<string, ComponentDef>;
     computedDef: Record<string, (this: any) => any>;
+    watchDef: Record<string, WatchCallback | WatchOptions>;
 
     el: Element | null;
     app: MelodiJS | null;
@@ -194,6 +261,7 @@ class Component {
         this.hooks = def.hooks || {}
         this.components = def.components || {}
         this.computedDef = def.computed || {}
+        this.watchDef = def.watch || {}
 
         this.el = null
         this.app = null
@@ -240,6 +308,11 @@ class Component {
 
         // attach $store to raw data so methods/state can access it
         initial.$store = app.store
+
+        // Inject router BEFORE creating reactive state (so computed can access it)
+        if ((app as any).router) {
+            initial.$router = (app as any).router;
+        }
 
         // create reactive state
         this.reactivity = app.reactivity;
@@ -308,6 +381,71 @@ class Component {
             console.error('Error binding methods:', e)
         }
 
+        // Setup watchers
+        try {
+            Object.keys(this.watchDef).forEach(key => {
+                const watchSpec = this.watchDef[key];
+                let handler: WatchCallback;
+                let immediate = false;
+                let deep = false;
+
+                if (typeof watchSpec === 'function') {
+                    handler = watchSpec;
+                } else {
+                    handler = watchSpec.handler;
+                    immediate = watchSpec.immediate || false;
+                    deep = watchSpec.deep || false;
+                }
+
+                // Bind handler to state
+                const boundHandler = handler.bind(this.state);
+
+                // Get the signal for this property
+                const signal = this._signals[key];
+                if (!signal) {
+                    console.warn(`Watch: property '${key}' not found in data`);
+                    return;
+                }
+
+                const [getter] = signal;
+                let oldValue = getter();
+                let isFirstRun = true;
+
+                // Create effect to watch changes
+                this._createEffect(() => {
+                    const newValue = getter();
+
+                    // Skip first run unless immediate is true
+                    if (isFirstRun) {
+                        isFirstRun = false;
+                        if (immediate) {
+                            try {
+                                boundHandler(newValue, undefined);
+                            } catch (e) {
+                                console.error(`Error in immediate watcher for '${key}':`, e);
+                            }
+                        }
+                        oldValue = newValue;
+                        return;
+                    }
+
+                    // Only trigger if value actually changed
+                    if (newValue !== oldValue || deep) {
+                        const prevValue = oldValue;
+                        oldValue = newValue;
+                        // Call handler with new and old values
+                        try {
+                            boundHandler(newValue, prevValue);
+                        } catch (e) {
+                            console.error(`Error in watcher for '${key}':`, e);
+                        }
+                    }
+                });
+            });
+        } catch (e) {
+            console.error('Error setting up watchers:', e);
+        }
+
         // register component on app so store updates can notify
         app._mountedComponents = app._mountedComponents || []
         app._mountedComponents.push(this)
@@ -373,13 +511,33 @@ class Component {
         this._signals = {};
         if (!this.reactivity) return state; // Should not happen
         for (const key of Object.keys(obj)) {
-            const [getter, setter] = this.reactivity.createSignal(obj[key]);
-            Object.defineProperty(state, key, {
-                get: getter,
-                set: setter,
-                enumerable: true,
-                configurable: true
-            });
+            const initialValue = obj[key];
+            const [getter, setter] = this.reactivity.createSignal(initialValue);
+
+            // Wrap arrays in a Proxy to intercept mutations
+            if (Array.isArray(initialValue)) {
+                const proxyArray = this._makeReactiveArray(initialValue, setter);
+                setter(proxyArray);
+                Object.defineProperty(state, key, {
+                    get: getter,
+                    set: (newVal) => {
+                        if (Array.isArray(newVal)) {
+                            setter(this._makeReactiveArray(newVal, setter));
+                        } else {
+                            setter(newVal);
+                        }
+                    },
+                    enumerable: true,
+                    configurable: true
+                });
+            } else {
+                Object.defineProperty(state, key, {
+                    get: getter,
+                    set: setter,
+                    enumerable: true,
+                    configurable: true
+                });
+            }
             this._signals[key] = [getter, setter];
         }
 
@@ -397,6 +555,36 @@ class Component {
         }
 
         return state;
+    }
+
+    _makeReactiveArray(arr: any[], setter: SignalWrite<any>): any[] {
+        const mutatingMethods = ['push', 'pop', 'shift', 'unshift', 'splice', 'sort', 'reverse'];
+
+        const proxy = new Proxy(arr, {
+            get(target, prop) {
+                const value = (target as any)[prop];
+
+                // Intercept mutating methods
+                if (typeof prop === 'string' && mutatingMethods.includes(prop)) {
+                    return function (...args: any[]) {
+                        const result = (Array.prototype as any)[prop].apply(target, args);
+                        // Trigger reactivity - setter will always trigger for objects
+                        setter(proxy);
+                        return result;
+                    };
+                }
+
+                return value;
+            },
+            set(target, prop, value) {
+                (target as any)[prop] = value;
+                // Trigger reactivity on index assignment
+                setter(proxy);
+                return true;
+            }
+        });
+
+        return proxy;
     }
 
     _evalExpression(expr: string, scope: any): any {
@@ -447,20 +635,14 @@ class Component {
         let tempDiv: HTMLDivElement;
 
         if (!tpl) {
-            // If no template, use the element's initial HTML (but clear it first)
-            // We clone the nodes to a fragment to process them
-            const fragment = document.createDocumentFragment();
-            if (this.el) {
-                while (this.el.firstChild) {
-                    fragment.appendChild(this.el.firstChild);
-                }
+            // If no template, use the slot source (which contains the original HTML)
+            // This allows root components to work without explicit template
+            if (this._slotSource && this._slotSource.childNodes.length > 0) {
+                this._fragment = this._processNodeList(Array.from(this._slotSource.childNodes));
+            } else {
+                // Completely empty
+                this._fragment = document.createDocumentFragment();
             }
-            // If no template provided, the "slot source" IS the template effectively, 
-            // but usually components have a template. 
-            // If we are here, it means we are using the innerHTML as the template.
-            // In this case, slots don't make much sense unless we are a higher-order component?
-            // Actually, if no template is defined, we treat the content as the template.
-            this._fragment = this._processNodeList(Array.from(fragment.childNodes));
         } else {
             // If template string provided
             if (typeof tpl === 'object') {
@@ -707,43 +889,76 @@ class Component {
         const effectFn = () => {
             this._createEffect(() => {
                 const shouldShow = !!this._evalExpression(expr, scope);
+                // Check for transition parent
+                let transitionName: string | null = null;
+                if (anchor.parentNode && (anchor.parentNode as HTMLElement).dataset && (anchor.parentNode as HTMLElement).dataset.melodiTransition) {
+                    transitionName = (anchor.parentNode as HTMLElement).dataset.melodiTransition!;
+                }
+
                 if (shouldShow) {
                     if (!currentEl) {
                         const clone = node.cloneNode(true) as Element;
                         clone.removeAttribute('v-if');
-                        // We must process the new node
-                        // Note: _walk might return a Fragment if the node itself had v-if (recursion?) 
-                        // No, we removed v-if.
                         const processed = this._walk(clone, scope);
 
-                        // Handle Fragment vs Node
                         if (processed.nodeType === 11) {
-                            // If fragment, we need to insert all children. 
-                            // Tracking them is harder. For simplicity, assume single element for now 
-                            // or wrap in a temp span if multiple? 
-                            // Let's just insert them.
-                            // BUT we need to track them to remove them later.
-                            // Current limitation: v-if on <template> or text nodes might be tricky.
-                            // Let's assume 1 root element for v-if target usually.
-                            currentEl = processed;
+                            currentEl = processed; // Fragment handling is limited
                         } else {
                             currentEl = processed;
                         }
 
                         if (anchor.parentNode) {
-                            anchor.parentNode.insertBefore(currentEl, anchor);
+                            // Transition Enter
+                            if (transitionName && currentEl && currentEl.nodeType === 1) {
+                                const el = currentEl as HTMLElement;
+                                el.classList.add(transitionName + '-enter-from');
+                                el.classList.add(transitionName + '-enter-active');
+                                anchor.parentNode.insertBefore(currentEl, anchor);
+
+                                requestAnimationFrame(() => {
+                                    el.classList.remove(transitionName + '-enter-from');
+                                    el.classList.add(transitionName + '-enter-to');
+                                    const onEnd = () => {
+                                        el.classList.remove(transitionName + '-enter-active');
+                                        el.classList.remove(transitionName + '-enter-to');
+                                        el.removeEventListener('transitionend', onEnd);
+                                    };
+                                    el.addEventListener('transitionend', onEnd);
+                                });
+                            } else {
+                                anchor.parentNode.insertBefore(currentEl, anchor);
+                            }
                         }
                     }
                 } else {
                     if (currentEl) {
-                        if (currentEl.nodeType === 11) {
-                            // If it was a fragment, we can't easily remove "it".
-                            // We would have needed to track childNodes.
-                            // For now, let's assume standard element.
-                        } else if (currentEl.parentNode) {
-                            currentEl.parentNode.removeChild(currentEl);
-                        }
+                        const elToRemove = currentEl;
                         currentEl = null;
+
+                        if (transitionName && elToRemove.nodeType === 1 && elToRemove.parentNode) {
+                            // Transition Leave
+                            const el = elToRemove as HTMLElement;
+                            el.classList.add(transitionName + '-leave-from');
+                            el.classList.add(transitionName + '-leave-active');
+
+                            requestAnimationFrame(() => {
+                                el.classList.remove(transitionName + '-leave-from');
+                                el.classList.add(transitionName + '-leave-to');
+                                const onEnd = () => {
+                                    el.classList.remove(transitionName + '-leave-active');
+                                    el.classList.remove(transitionName + '-leave-to');
+                                    if (el.parentNode) el.parentNode.removeChild(el);
+                                    el.removeEventListener('transitionend', onEnd);
+                                };
+                                el.addEventListener('transitionend', onEnd);
+                            });
+                        } else {
+                            if (elToRemove.nodeType === 11) {
+                                // Fragment
+                            } else if (elToRemove.parentNode) {
+                                elToRemove.parentNode.removeChild(elToRemove);
+                            }
+                        }
                     }
                 }
             });
@@ -1038,8 +1253,14 @@ class Component {
     }
 
     async _mountNestedComponents(): Promise<void> {
-        if (!this.app || !this.app.components || !this.el) return
-        const tags = Object.keys(this.app.components)
+        if (!this.app || !this.el) return
+
+        // Merge global and local components
+        const globalComponents = this.app.components || {};
+        const localComponents = this.components || {};
+        const allComponents = { ...globalComponents, ...localComponents };
+
+        const tags = Object.keys(allComponents)
         for (const tag of tags) {
             const nodes: Element[] = Array.from(this.el.querySelectorAll(tag))
             for (const node of nodes) {
@@ -1066,7 +1287,7 @@ class Component {
                 }
 
                 if (skip) continue
-                const compDef = this.app.components[tag]
+                const compDef = allComponents[tag]
                 const comp = new Component(compDef)
                 // set logical parent so events can bubble even if DOM structure differs
                 try { comp._parent = this } catch (e) { }
@@ -1093,4 +1314,4 @@ function createApp(options: MelodiOptions): MelodiJS {
     return new MelodiJS(options)
 }
 
-export { createApp }
+export { createApp, MelodiJS }

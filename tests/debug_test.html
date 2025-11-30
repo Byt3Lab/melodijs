@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Debug Test</title>
+</head>
+
+<body>
+    <div id="app">
+        <h1>Debug Test</h1>
+        <p>Count: {{ count }}</p>
+        <button @click="increment">Increment</button>
+
+        <h2>Toggle Test</h2>
+        <button @click="toggle">Toggle</button>
+        <div v-if="show">Visible!</div>
+
+        <h2>Array Test</h2>
+        <button @click="addItem">Add Item</button>
+        <div v-for="(item, index) in items" :key="index">
+            {{ item }}
+        </div>
+
+        <h2>Watch Test</h2>
+        <input v-model="username">
+        <p>Username: {{ username }}</p>
+        <div>{{ watchMessage }}</div>
+    </div>
+
+    <script type="module">
+        import { createApp } from '../dist/melodijs.js';
+
+        const app = createApp({
+            data: () => ({
+                count: 0,
+                show: true,
+                items: ['Item 1'],
+                username: '',
+                watchMessage: ''
+            }),
+            methods: {
+                increment() {
+                    console.log('Increment called');
+                    this.count++;
+                },
+                toggle() {
+                    console.log('Toggle called, current:', this.show);
+                    this.show = !this.show;
+                },
+                addItem() {
+                    console.log('Add item called');
+                    // Test with mutation
+                    this.items.push('Item ' + (this.items.length + 1));
+                    console.log('Items:', this.items);
+                }
+            },
+            watch: {
+                username(newVal, oldVal) {
+                    console.log('Username changed:', oldVal, '->', newVal);
+                    this.watchMessage = `Changed from "${oldVal}" to "${newVal}"`;
+                }
+            }
+        });
+
+        app.mount('#app');
+        console.log('App mounted');
+    </script>
+</body>
+
+</html>

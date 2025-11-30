@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>MelodiJS Test</title>
+</head>
+
+<body>
+    <div id="app">
+        <test-component></test-component>
+    </div>
+
+    <script type="module">
+        import { createApp } from '../dist/melodijs.js'
+
+        const TestComponent = {
+            template: `
+                <div>
+                    <h1>{{ title }}</h1>
+                    <p>Store Count: {{ $store.count }}</p>
+                    <button @click="increment" id="btn-inc">Inc Store</button>
+                    <div v-if="show">
+                        Showing content
+                    </div>
+                    <button @click="toggle" id="btn-toggle">Toggle</button>
+                </div>
+            `,
+            data() {
+                return {
+                    title: 'Test Component',
+                    show: true
+                };
+            },
+            methods: {
+                increment() {
+                    this.$store.count++;
+                    console.log('Store count incremented to', this.$store.count);
+                },
+                toggle() {
+                    this.show = !this.show;
+                    console.log('Toggled show to', this.show);
+                }
+            },
+            hooks: {
+                mounted() {
+                    console.log('Component mounted');
+                },
+                unmounted() {
+                    console.log('Component unmounted');
+                },
+                beforeMount() {
+                    alert("sdsd")
+                },
+                updated() {
+                    alert("sdsd")
+                }
+            }
+        };
+
+        window.app = createApp({
+            store: { count: 0 },
+            components: {
+                'test-component': TestComponent
+            }
+        });
+
+        app.mount('#app').then(() => {
+            console.log('App mounted');
+        });
+    </script>
+</body>
+
+</html>

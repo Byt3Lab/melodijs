@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MelodiJS Features Demo</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            padding: 20px;
+        }
+
+        nav a {
+            margin-right: 10px;
+            cursor: pointer;
+            text-decoration: underline;
+            color: blue;
+        }
+
+        .fade-enter-active,
+        .fade-leave-active {
+            transition: opacity 0.5s;
+        }
+
+        .fade-enter-from,
+        .fade-leave-to {
+            opacity: 0;
+        }
+
+        .box {
+            width: 100px;
+            height: 100px;
+            background-color: lightcoral;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="app">
+        <h1>MelodiJS Demo</h1>
+
+        <h2>Router</h2>
+        <nav>
+            <router-link to="/">Home</router-link>
+            <router-link to="/about">About</router-link>
+        </nav>
+        <div style="border: 1px solid #ccc; padding: 10px; margin-top: 10px;">
+            <router-view></router-view>
+        </div>
+
+        <h2 v-if="showBox">Transitions</h2>
+        <button @click="toggle">Toggle Box</button>
+    </div>
+
+    <script type="module">
+        import { createApp } from '../dist/melodijs.js';
+        import { MelodiRouter } from '../dist/router.js';
+
+        const Home = {
+            template: '<div><h3>Home Page</h3><p>Welcome to the home page!</p></div>'
+        };
+
+        const About = {
+            template: '<div><h3>About Page</h3><p>This is the about page.</p></div>'
+        };
+
+        const router = new MelodiRouter({
+            routes: [
+                { path: '/', component: Home },
+                { path: '/about', component: About }
+            ]
+        });
+
+        const app = createApp({
+            data: () => ({
+                showBox: true
+            }),
+            methods: {
+                toggle() {
+                    this.showBox = !this.showBox;
+                }
+            }
+        });
+
+        app.use(router);
+        app.mount('#app');
+    </script>
+</body>
+
+</html>

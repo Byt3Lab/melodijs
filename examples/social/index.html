@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MelodiBook</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+
+<body>
+    <div id="app">
+        <router-view></router-view>
+    </div>
+
+    <script type="module">
+        import { createApp } from '../../dist/melodijs.js';
+        import { MelodiRouter } from '../../dist/router.js';
+        import { MelodiStore } from '../../dist/store.js';
+
+        // --- Store ---
+        const store = new MelodiStore({
+            state: () => ({
+                user: null, // { name, avatar }
+                posts: [
+                    {
+                        id: 1,
+                        author: 'MelodiJS Team',
+                        avatar: 'https://ui-avatars.com/api/?name=Melodi+JS&background=1877f2&color=fff',
+                        time: '2h',
+                        content: 'Welcome to MelodiBook! This is a demo built with MelodiJS 🎵',
+                        image: 'https://picsum.photos/seed/melodi/600/300',
+                        likes: 42,
+                        comments: 5,
+                        isLiked: false
+                    },
+                    {
+                        id: 2,
+                        author: 'John Doe',
+                        avatar: 'https://ui-avatars.com/api/?name=John+Doe&background=random',
+                        time: '4h',
+                        content: 'Just trying out the new router features. Scroll behavior is smooth! 😎',
+                        likes: 12,
+                        comments: 1,
+                        isLiked: true
+                    }
+                ]
+            }),
+            actions: {
+                login(username) {
+                    this.state.user = {
+                        name: username,
+                        avatar: `https://ui-avatars.com/api/?name=${username}&background=random`
+                    };
+                },
+                logout() {
+                    this.state.user = null;
+                },
+                addPost(content) {
+                    const newPost = {
+                        id: Date.now(),
+                        author: this.state.user.name,
+                        avatar: this.state.user.avatar,
+                        time: 'Just now',
+                        content: content,
+                        likes: 0,
+                        comments: 0,
+                        isLiked: false
+                    };
+                    this.state.posts.unshift(newPost);
+                },
+                toggleLike(postId) {
+                    const post = this.state.posts.find(p => p.id === postId);
+                    if (post) {
+                        post.isLiked = !post.isLiked;
+                        post.likes += post.isLiked ? 1 : -1;
+                    }
+                }
+            }
+        });
+
+        // --- Components ---
+
+        const Post = {
+            props: ['post'],
+            methods: {
+                like() {
+                    this.$store.dispatch('toggleLike', this.post.id);
+                }
+            },
+            template: `
+                <div class="post-card">
+                    <div class="post-header">
+                        <div class="post-author">
+                            <img :src="post.avatar" class="user-avatar">
+                            <div>
+                                <div class="author-name">{{post.author}}</div>
+                                <div class="post-time">{{post.time}}</div>
+                            </div>
+                        </div>
+                        <div class="post-menu">...</div>
+                    </div>
+                    <div class="post-content">
+                        {{post.content}}
+                    </div>
+                    <img v-if="post.image" :src="post.image" class="post-image">
+                    <div class="post-stats">
+                        <span>{{post.likes}} Likes</span>
+                        <span>{{post.comments}} Comments</span>
+                    </div>
+                    <div class="post-actions">
+                        <button class="action-btn like-btn" :class="{liked: post.isLiked}" @click="like">
+                            👍 Like
+                        </button>
+                        <button class="action-btn">💬 Comment</button>
+                        <button class="action-btn">share Share</button>
+                    </div>
+                </div>
+            `
+        };
+
+        const CreatePost = {
+            data: () => ({ content: '' }),
+            methods: {
+                submit() {
+                    if (this.content.trim()) {
+                        this.$store.dispatch('addPost', this.content);
+                        this.content = '';
+                    }
+                }
+            },
+            template: `
+                <div class="create-post">
+                    <div class="create-input-row">
+                        <img :src="$store.state.user.avatar" class="user-avatar">
+                        <input v-model="content" placeholder="What's on your mind?" class="post-input" @keyup.enter="submit">
+                    </div>
+                    <div class="create-actions">
+                        <button class="action-btn">🎥 Live Video</button>
+                        <button class="action-btn">📷 Photo/Video</button>
+                        <button class="action-btn">😊 Feeling/Activity</button>
+                    </div>
+                </div>
+            `
+        };
+
+        const Feed = {
+            components: { 'post-card': Post, 'create-post': CreatePost },
+            computed: {
+                posts() { return this.$store.state.posts; }
+            },
+            template: `
+                <div class="feed">
+                    <create-post></create-post>
+                    <post-card v-for="p in posts" :key="p.id" :post="p"></post-card>
+                </div>
+            `
+        };
+
+        const SidebarLeft = {
+            template: `
+                <div class="sidebar-left">
+                    <div class="menu-item">
+                        <img :src="$store.state.user.avatar" class="menu-icon">
+                        <span class="menu-text">{{$store.state.user.name}}</span>
+                    </div>
+                    <div class="menu-item">
+                        <div class="menu-icon">👥</div>
+                        <span class="menu-text">Friends</span>
+                    </div>
+                    <div class="menu-item">
+                        <div class="menu-icon">🏪</div>
+                        <span class="menu-text">Marketplace</span>
+                    </div>
+                    <div class="menu-item">
+                        <div class="menu-icon">📺</div>
+                        <span class="menu-text">Watch</span>
+                    </div>
+                    <div class="menu-item">
+                        <div class="menu-icon">⏰</div>
+                        <span class="menu-text">Memories</span>
+                    </div>
+                </div>
+            `
+        };
+
+        const Header = {
+            methods: {
+                logout() {
+                    this.$store.dispatch('logout');
+                    this.$router.push('/login');
+                }
+            },
+            template: `
+                <header class="header">
+                    <div class="header-left">
+                        <router-link to="/" class="logo">melodibook</router-link>
+                    </div>
+                    <div class="header-center">
+                        <div class="search-bar">
+                            <span>🔍</span>
+                            <input type="text" placeholder="Search MelodiBook" class="search-input">
+                        </div>
+                    </div>
+                    <div class="header-right">
+                        <div class="nav-icons">
+                            <div class="nav-icon" @click="logout" title="Logout">🚪</div>
+                        </div>
+                    </div>
+                </header>
+            `
+        };
+
+        const MainLayout = {
+            components: { 'app-header': Header, 'sidebar-left': SidebarLeft },
+            template: `
+                <div>
+                    <app-header></app-header>
+                    <div class="main-container">
+                        <sidebar-left></sidebar-left>
+                        <div class="feed">
+                            <router-view></router-view>
+                        </div>
+                        <div class="sidebar-right">
+                            <div class="menu-text" style="color: #65676b; margin-bottom: 10px;">Contacts</div>
+                             <div class="menu-item">
+                                <img src="https://ui-avatars.com/api/?name=Alice&background=random" class="user-avatar" style="margin-right: 10px;">
+                                <span>Alice</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `
+        };
+
+        const Login = {
+            data: () => ({ username: '' }),
+            methods: {
+                login() {
+                    if (this.username) {
+                        this.$store.dispatch('login', this.username);
+                        const redirect = this.$router.query().redirect || '/';
+                        this.$router.push(redirect);
+                    }
+                }
+            },
+            template: `
+                <div class="login-page">
+                    <div style="margin-bottom: 20px;">
+                        <h1 style="color: var(--primary); font-size: 40px;">melodibook</h1>
+                    </div>
+                    <div class="login-card">
+                        <input v-model="username" placeholder="Email or Phone Number" class="login-input" @keyup.enter="login">
+                        <input type="password" placeholder="Password" class="login-input">
+                        <button @click="login" class="btn-primary">Log In</button>
+                        <div style="margin-top: 16px;">
+                            <a href="#" style="color: var(--primary); text-decoration: none; font-size: 14px;">Forgot Password?</a>
+                        </div>
+                        <hr style="margin: 20px 0; border: 0; border-top: 1px solid #dadde1;">
+                        <button style="background: #42b72a; color: white; border: none; padding: 10px 16px; border-radius: 6px; font-weight: bold; font-size: 17px; cursor: pointer;">Create New Account</button>
+                    </div>
+                </div>
+            `
+        };
+
+        // --- Router ---
+        const router = new MelodiRouter({
+            routes: [
+                {
+                    path: '/',
+                    component: MainLayout,
+                    children: [
+                        { path: '', component: Feed },
+                        { path: 'profile', component: { template: '<div><h2>Profile Page</h2><p>Coming soon...</p></div>' } }
+                    ]
+                },
+                { path: '/login', component: Login }
+            ]
+        });
+
+
+
+        // Navigation Guard
+        router.beforeEach((to, from, next) => {
+            const isAuthenticated = !!store.state.user;
+            if (to !== '/login' && !isAuthenticated) {
+                next('/login?redirect=' + to);
+            } else {
+                next();
+            }
+        });
+
+        const app = createApp({});
+        app.use(store);
+        app.use(router);
+        app.mount('#app');
+    </script>
+</body>
+
+</html>

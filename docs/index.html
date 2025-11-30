@@ -15,28 +15,21 @@
       --vt-c-white: #ffffff;
       --vt-c-white-soft: #f8f8f8;
       --vt-c-white-mute: #f2f2f2;
-
       --vt-c-black: #181818;
       --vt-c-black-soft: #222222;
       --vt-c-black-mute: #282828;
-
       --vt-c-indigo: #2c3e50;
-
       --vt-c-divider-light-1: rgba(60, 60, 60, 0.29);
       --vt-c-divider-light-2: rgba(60, 60, 60, 0.12);
       --vt-c-divider-dark-1: rgba(84, 84, 84, 0.65);
       --vt-c-divider-dark-2: rgba(84, 84, 84, 0.48);
-
       --vt-c-text-light-1: #2c3e50;
       --vt-c-text-light-2: #476582;
       --vt-c-text-dark-1: rgba(255, 255, 255, 0.87);
       --vt-c-text-dark-2: rgba(235, 235, 235, 0.6);
-
       --brand-color: #2a3886;
       --brand-color-light: #2a3886;
       --brand-color-dark: #2a3886;
-
-      /* Semantic Colors */
       --color-background: var(--vt-c-white);
       --color-background-soft: var(--vt-c-white-soft);
       --color-background-mute: var(--vt-c-white-mute);
@@ -46,7 +39,6 @@
       --color-text: var(--vt-c-text-light-1);
       --color-text-light: var(--vt-c-text-light-2);
       --section-gap: 160px;
-
       --code-bg: #f8f8f8;
       --code-text: #2c3e50;
     }
@@ -60,7 +52,6 @@
       --color-heading: var(--vt-c-text-dark-1);
       --color-text: var(--vt-c-text-dark-2);
       --color-text-light: var(--vt-c-text-dark-2);
-
       --code-bg: #1e1e1e;
       --code-text: #d4d4d4;
     }
@@ -86,14 +77,12 @@
       -webkit-font-smoothing: antialiased;
     }
 
-    /* Layout */
     .app-layout {
       display: flex;
       flex-direction: column;
       min-height: 100vh;
     }
 
-    /* Header */
     header {
       position: fixed;
       top: 0;
@@ -139,7 +128,6 @@
       color: var(--brand-color);
     }
 
-    /* Sidebar */
     .sidebar {
       position: fixed;
       top: 60px;
@@ -179,7 +167,6 @@
       color: var(--brand-color);
     }
 
-    /* Main Content */
     main {
       margin-top: 60px;
       margin-left: 280px;
@@ -247,7 +234,6 @@
       text-decoration: underline;
     }
 
-    /* Code Blocks */
     pre {
       background-color: var(--code-bg);
       color: var(--code-text);
@@ -299,7 +285,6 @@
       color: #eab308;
     }
 
-    /* Mobile */
     @media (max-width: 960px) {
       .sidebar {
         transform: translateX(-100%);
@@ -353,29 +338,35 @@
         <div class="sidebar-heading">Getting Started</div>
         <a href="#introduction" class="sidebar-link">Introduction</a>
         <a href="#quick-start" class="sidebar-link">Quick Start</a>
+        <a href="#creating-app" class="sidebar-link">Creating an Application</a>
       </div>
       <div class="sidebar-group">
         <div class="sidebar-heading">Essentials</div>
         <a href="#template-syntax" class="sidebar-link">Template Syntax</a>
-        <a href="#reactivity" class="sidebar-link">Reactivity Fundamentals</a>
-        <a href="#computed" class="sidebar-link">Computed Properties</a>
-        <a href="#class-and-style" class="sidebar-link">Class & Style Bindings</a>
-        <a href="#conditional" class="sidebar-link">Conditional Rendering</a>
+        <a href="#template-options" class="sidebar-link">Template Options</a>
+        <a href="#reactivity" class="sidebar-link">Reactivity</a>
+        <a href="#computed" class="sidebar-link">Computed</a>
+        <a href="#watchers" class="sidebar-link">Watchers</a>
+        <a href="#class-style" class="sidebar-link">Class & Style</a>
+        <a href="#conditional" class="sidebar-link">Conditional</a>
         <a href="#list" class="sidebar-link">List Rendering</a>
-        <a href="#events" class="sidebar-link">Event Handling</a>
-        <a href="#forms" class="sidebar-link">Form Input Bindings</a>
+        <a href="#events" class="sidebar-link">Events</a>
+        <a href="#forms" class="sidebar-link">Forms</a>
       </div>
       <div class="sidebar-group">
         <div class="sidebar-heading">Components</div>
-        <a href="#components-basics" class="sidebar-link">Basics</a>
+        <a href="#components" class="sidebar-link">Basics</a>
         <a href="#props" class="sidebar-link">Props</a>
-        <a href="#component-events" class="sidebar-link">Events ($emit)</a>
+        <a href="#events-component" class="sidebar-link">Events</a>
         <a href="#slots" class="sidebar-link">Slots</a>
+        <a href="#lifecycle" class="sidebar-link">Lifecycle</a>
       </div>
       <div class="sidebar-group">
         <div class="sidebar-heading">Advanced</div>
-        <a href="#lifecycle" class="sidebar-link">Lifecycle Hooks</a>
+        <a href="#router" class="sidebar-link">Router</a>
+        <a href="#transitions" class="sidebar-link">Transitions</a>
         <a href="#store" class="sidebar-link">State Management</a>
+        <a href="#plugins" class="sidebar-link">Plugins</a>
       </div>
     </aside>
 
@@ -389,267 +380,422 @@
           <strong>Why MelodiJS?</strong>
           <ul>
             <li><strong>No Virtual DOM:</strong> Updates are surgical and target exact DOM nodes.</li>
-            <li><strong>Tiny Footprint:</strong> ~3KB gzipped.</li>
+            <li><strong>Tiny Footprint:</strong> ~3KB gzipped core.</li>
             <li><strong>Familiar API:</strong> If you know Vue, you know MelodiJS.</li>
+            <li><strong>Reactive Arrays:</strong> Array mutations automatically trigger updates.</li>
+            <li><strong>Built-in Router & Store:</strong> Everything you need out of the box.</li>
           </ul>
         </div>
       </section>
 
       <section id="quick-start">
         <h2>Quick Start</h2>
-        <p>You can use MelodiJS directly via CDN or install it via NPM.</p>
+        <p>Get started with MelodiJS in seconds using a CDN or npm.</p>
 
-        <h3>Via CDN (ES Modules)</h3>
+        <h3>Via CDN</h3>
         <pre><code>&lt;script type="module"&gt;
   import { createApp } from 'https://unpkg.com/melodijs';
 
   createApp({
-    data() {
-      return {
-        message: 'Hello Melodi!'
-      }
-    }
+    data: () => ({ message: 'Hello Melodi!' })
   }).mount('#app')
 &lt;/script&gt;</code></pre>
 
         <h3>Via NPM</h3>
         <pre><code>npm install melodijs</code></pre>
+        <pre><code>import { createApp } from 'melodijs';
+
+const app = createApp({
+  data: () => ({ count: 0 }),
+  methods: {
+    increment() { this.count++ }
+  }
+});
+
+app.mount('#app');</code></pre>
       </section>
 
-      <section id="template-syntax">
-        <h2>Template Syntax</h2>
-        <p>MelodiJS uses an HTML-based template syntax that allows you to declaratively bind the rendered DOM to the
-          underlying component instance's data.</p>
+      <section id="creating-app">
+        <h2>Creating an Application</h2>
+        <p>MelodiJS supports two ways to create applications:</p>
 
-        <h3>Text Interpolation</h3>
-        <p>The most basic form of data binding is text interpolation using the "Mustache" syntax (double curly braces):
-        </p>
-        <pre><code>&lt;span&gt;Message: {{ msg }}&lt;/span&gt;</code></pre>
-
-        <h3>Raw HTML</h3>
-        <p>MelodiJS escapes HTML by default. To render raw HTML, you would typically use a directive (not yet
-          implemented in core, use standard DOM manipulation in hooks if needed).</p>
-
-        <h3>Attribute Binding</h3>
-        <p>Mustaches cannot be used inside HTML attributes. Instead, use a <code>v-bind</code> directive:</p>
-        <pre><code>&lt;div v-bind:id="dynamicId"&gt;&lt;/div&gt;</code></pre>
-        <p>Shorthand:</p>
-        <pre><code>&lt;div :id="dynamicId"&gt;&lt;/div&gt;</code></pre>
-      </section>
-
-      <section id="reactivity">
-        <h2>Reactivity Fundamentals</h2>
-        <p>We declare reactive state using the <code>data</code> option. It should be a function that returns an object.
-        </p>
-        <pre><code>export default {
-  data() {
-    return {
-      count: 1
+        <h3>Root Component API (Recommended)</h3>
+        <p>Define your app as a single root component with data, methods, computed, watch, etc.</p>
+        <pre><code>const app = createApp({
+  data: () => ({
+    message: 'Hello World',
+    count: 0
+  }),
+  computed: {
+    doubleCount() {
+      return this.count * 2;
     }
   },
   methods: {
     increment() {
-      this.count++ // Updates the DOM automatically
+      this.count++;
     }
   }
+});
+
+app.mount('#app');</code></pre>
+
+        <h3>Component Registration (Legac
+
+          y)</h3>
+        <p>Register components that will automatically mount to matching HTML elements.</p>
+        <pre><code>createApp({
+  components: {
+    'my-component': {
+      data: () => ({ message: 'Hello' }),
+      template: '&lt;div&gt;{{ message }}&lt;/div&gt;'
+    }
+  }
+}).mount('#app');</code></pre>
+      </section>
+
+      <section id="template-syntax">
+        <h2>Template Syntax</h2>
+
+        <h3>Text Interpolation</h3>
+        <pre><code>&lt;span&gt;Message: {{ msg }}&lt;/span&gt;</code></pre>
+
+        <h3>Attribute Binding</h3>
+        <pre><code>&lt;div v-bind:id="dynamicId"&gt;&lt;/div&gt;
+&lt;!-- Shorthand --&gt;
+&lt;div :id="dynamicId"&gt;&lt;/div&gt;</code></pre>
+
+        <h3>JavaScript Expressions</h3>
+        <pre><code>{{ number + 1 }}
+{{ ok ? 'YES' : 'NO' }}
+{{ message.split('').reverse().join('') }}</code></pre>
+      </section>
+
+      <section id="template-options">
+        <h2>Template Options</h2>
+        <p>MelodiJS provides three ways to define component templates:</p>
+
+        <h3>1. Inline String</h3>
+        <pre><code>{
+  template: '&lt;div&gt;{{ message }}&lt;/div&gt;'
 }</code></pre>
+
+        <h3>2. From Element (ID Selector)</h3>
+        <pre><code>&lt;script type="text/template" id="my-template"&gt;
+  &lt;div&gt;{{ message }}&lt;/div&gt;
+&lt;/script&gt;
+
+{
+  template: { el: '#my-template' }
+}</code></pre>
+
+        <h3>3. From URL</h3>
+        <pre><code>{
+  template: { url: '/templates/my-component.html' }
+}</code></pre>
+
+        <div class="tip">
+          <strong>Root Component Templates</strong><br>
+          When using the root component API without a template property, MelodiJS uses the innerHTML of the mount target
+          as the template.
+        </div>
+      </section>
+
+      <section id="reactivity">
+        <h2>Reactivity Fundamentals</h2>
+        <p>Declare reactive state using the <code>data</code> function:</p>
+        <pre><code>data: () => ({
+  count: 0,
+  message: 'Hello',
+  items: [1, 2, 3]
+})</code></pre>
+
+        <h3>Array Reactivity</h3>
+        <p>MelodiJS automatically tracks array mutations:</p>
+        <pre><code>this.items.push(4);       // ✅ Reactive
+this.items.pop();         // ✅ Reactive
+this.items.splice(0, 1);  // ✅ Reactive
+this.items[0] = 99;       // ✅ Reactive</code></pre>
       </section>
 
       <section id="computed">
         <h2>Computed Properties</h2>
-        <p>For complex logic that includes reactive data, it is recommended to use a <strong>computed property</strong>.
-        </p>
-        <pre><code>export default {
-  data() {
-    return {
-      author: {
-        name: 'John Doe',
-        books: ['Vue 2 - Advanced Guide', 'Vue 3 - Basic Guide']
-      }
-    }
+        <p>Computed properties are cached and only re-evaluate when dependencies change:</p>
+        <pre><code>computed: {
+  fullName() {
+    return `${this.firstName} ${this.lastName}`;
   },
-  computed: {
-    publishedBooksMessage() {
-      // `this` points to the component instance
-      return this.author.books.length > 0 ? 'Yes' : 'No'
-    }
+  total() {
+    return this.items.reduce((sum, item) => sum + item.price, 0);
   }
 }</code></pre>
-        <p>Computed properties are cached based on their reactive dependencies. A computed property will only
-          re-evaluate when some of its reactive dependencies have changed.</p>
       </section>
 
-      <section id="class-and-style">
-        <h2>Class & Style Bindings</h2>
-        <p>A common need for data binding is manipulating an element's class list and inline styles. MelodiJS provides
-          special enhancements for <code>class</code> and <code>style</code> when used with <code>v-bind</code>.</p>
+      <section id="watchers">
+        <h2>Watchers</h2>
+        <p>React to data changes with watchers:</p>
 
-        <h3>Binding HTML Classes</h3>
-        <p>We can pass an object to <code>:class</code> to dynamically toggle classes:</p>
+        <h3>Simple Watcher</h3>
+        <pre><code>watch: {
+  username(newVal, oldVal) {
+    console.log(`Username changed: ${oldVal} → ${newVal}`);
+  }
+}</code></pre>
+
+        <h3>Watcher with Options</h3>
+        <pre><code>watch: {
+  userId: {
+    handler(newVal) {
+      this.loadUserData(newVal);
+    },
+    immediate: true  // Run on mount
+  }
+}</code></pre>
+      </section>
+
+      <section id="class-style">
+        <h2>Class & Style Bindings</h2>
+
+        <h3>Dynamic Classes</h3>
         <pre><code>&lt;div :class="{ active: isActive, 'text-danger': hasError }"&gt;&lt;/div&gt;</code></pre>
+
+        <h3>Dynamic Styles</h3>
+        <pre><code>&lt;div :style="{ color: textColor, fontSize: fontSize + 'px' }"&gt;&lt;/div&gt;</code></pre>
       </section>
 
       <section id="conditional">
         <h2>Conditional Rendering</h2>
 
         <h3>v-if</h3>
-        <p>The directive <code>v-if</code> is used to conditionally render a block. The block will only be rendered if
-          the directive's expression returns a truthy value.</p>
         <pre><code>&lt;h1 v-if="awesome"&gt;MelodiJS is awesome!&lt;/h1&gt;</code></pre>
 
         <h3>v-show</h3>
-        <p>Another option for conditionally displaying an element is <code>v-show</code>. The usage is largely the same:
-        </p>
         <pre><code>&lt;h1 v-show="ok"&gt;Hello!&lt;/h1&gt;</code></pre>
-        <p>The difference is that an element with <code>v-show</code> will always be rendered and remain in the DOM;
-          <code>v-show</code> only toggles the <code>display</code> CSS property of the element.
-        </p>
+        <p>The difference: <code>v-show</code> toggles CSS <code>display</code>, <code>v-if</code> removes/adds
+          elements.</p>
       </section>
 
       <section id="list">
         <h2>List Rendering</h2>
-        <p>We can use the <code>v-for</code> directive to render a list of items based on an array.</p>
-
         <pre><code>&lt;ul&gt;
-  &lt;li v-for="item in items" :key="item.id"&gt;
-    {{ item.message }}
+  &lt;li v-for="(item, index) in items" :key="item.id"&gt;
+    {{ index }}: {{ item.name }}
   &lt;/li&gt;
 &lt;/ul&gt;</code></pre>
 
         <div class="warning">
-          <strong>Key Attribute</strong><br>
-          It is highly recommended to provide a unique <code>:key</code> attribute for each item. This allows MelodiJS
-          to reuse and reorder existing DOM elements, significantly improving performance.
+          <strong>Always use :key</strong><br>
+          Providing a unique <code>:key</code> improves performance and prevents rendering bugs.
         </div>
       </section>
 
       <section id="events">
         <h2>Event Handling</h2>
-        <p>We can use the <code>v-on</code> directive, which we typically shorten to the <code>@</code> symbol, to
-          listen to DOM events and run some JavaScript when they're triggered.</p>
 
         <h3>Inline Handlers</h3>
-        <pre><code>&lt;button @click="count++"&gt;Add 1&lt;/button&gt;</code></pre>
+        <pre><code>&lt;button @click="count++"&gt;Increment&lt;/button&gt;</code></pre>
 
         <h3>Method Handlers</h3>
-        <pre><code>&lt;button @click="greet"&gt;Greet&lt;/button&gt;</code></pre>
+        <pre><code>&lt;button @click="handleClick"&gt;Click Me&lt;/button&gt;</code></pre>
+
+        <h3>Event with Parameters</h3>
+        <pre><code>&lt;button @click="say('Hello')"&gt;Say Hello&lt;/button&gt;</code></pre>
       </section>
 
       <section id="forms">
         <h2>Form Input Bindings</h2>
-        <p>You can use the <code>v-model</code> directive to create two-way data bindings on form input, textarea, and
-          select elements.</p>
+        <p>Use <code>v-model</code> for two-way data binding:</p>
 
-        <pre><code>&lt;input v-model="message" placeholder="edit me" /&gt;
-&lt;p&gt;Message is: {{ message }}&lt;/p&gt;
+        <h3>Text Input</h3>
+        <pre><code>&lt;input v-model="message" /&gt;</code></pre>
 
-&lt;input type="checkbox" id="checkbox" v-model="checked" /&gt;
-&lt;label for="checkbox"&gt;{{ checked }}&lt;/label&gt;</code></pre>
+        <h3>Checkbox</h3>
+        <pre><code>&lt;input type="checkbox" v-model="checked" /&gt;</code></pre>
+
+        <h3>Select</h3>
+        <pre><code>&lt;select v-model="selected"&gt;
+  &lt;option value="a"&gt;A&lt;/option&gt;
+  &lt;option value="b"&gt;B&lt;/option&gt;
+&lt;/select&gt;</code></pre>
       </section>
 
-      <section id="components-basics">
+      <section id="components">
         <h2>Component Basics</h2>
-        <p>Components allow us to split the UI into independent and reusable pieces.</p>
-
         <pre><code>createApp({
   components: {
     'button-counter': {
-      data() {
-        return { count: 0 }
-      },
+      data: () => ({ count: 0 }),
       template: `
         &lt;button @click="count++"&gt;
-          You clicked me {{ count }} times.
+          Clicked {{ count }} times
         &lt;/button&gt;`
     }
   }
-})</code></pre>
+}).mount('#app');</code></pre>
       </section>
 
       <section id="props">
         <h2>Props</h2>
-        <p>Props are custom attributes you can register on a component. When a value is passed to a prop attribute, it
-          becomes a property on that component instance.</p>
+        <pre><code>// Child component
+{
+  props: ['title', 'likes'],
+  template: '&lt;h3&gt;{{ title }} ({{ likes }}))&lt;/h3&gt;'
+}
 
-        <pre><code>// Child
-props: ['title'],
-template: '&lt;h4&gt;{{ title }}&lt;/h4&gt;'
-
-// Parent
-&lt;blog-post title="My journey with Melodi"&gt;&lt;/blog-post&gt;</code></pre>
+// Parent usage
+&lt;blog-post title="My Post" :likes="42"&gt;&lt;/blog-post&gt;</code></pre>
       </section>
 
-      <section id="component-events">
+      <section id="events-component">
         <h2>Component Events</h2>
-        <p>A component can emit custom events directly to the parent using the built-in <code>$emit</code> method.</p>
-
-        <pre><code>// Child
+        <pre><code>// Child emits event
 methods: {
   submit() {
-    this.$emit('submit', this.formData)
+    this.$emit('submit', this.formData);
   }
 }
 
-// Parent
+// Parent listens
 &lt;my-form @submit="handleSubmit"&gt;&lt;/my-form&gt;</code></pre>
       </section>
 
       <section id="slots">
         <h2>Slots</h2>
-        <p>MelodiJS supports content distribution API inspired by the Web Components spec, using the
-          <code>&lt;slot&gt;</code> element to serve as distribution outlets for content.
-        </p>
-
-        <pre><code>// NavigationLink component template
-&lt;a :href="url" class="nav-link"&gt;
+        <pre><code>// Component template
+&lt;button class="btn"&gt;
   &lt;slot&gt;&lt;/slot&gt;
-&lt;/a&gt;
+&lt;/button&gt;
 
 // Usage
-&lt;navigation-link url="/profile"&gt;
-  Your Profile
-&lt;/navigation-link&gt;</code></pre>
+&lt;my-button&gt;Click Me&lt;/my-button&gt;</code></pre>
       </section>
 
       <section id="lifecycle">
         <h2>Lifecycle Hooks</h2>
-        <p>Each component instance goes through a series of initialization steps when it's created. Along the way, it
-          runs functions called lifecycle hooks.</p>
-
         <ul>
-          <li><code>beforeMount</code>: Called right before the mounting begins.</li>
-          <li><code>mounted</code>: Called after the component has been mounted.</li>
-          <li><code>unmounted</code>: Called after the component has been unmounted.</li>
+          <li><code>beforeMount</code>: Before mounting begins</li>
+          <li><code>mounted</code>: After component is mounted</li>
+          <li><code>unmounted</code>: After component is unmounted</li>
         </ul>
-
-        <pre><code>mounted() {
-  console.log(`the component is now mounted.`)
+        <pre><code>hooks: {
+  mounted() {
+    console.log('Component mounted!');
+  }
 }</code></pre>
       </section>
 
-      <section id="store">
-        <h2>State Management</h2>
-        <p>MelodiJS includes a simple, lightweight global store for managing state across components.</p>
+      <section id="router">
+        <h2>Router</h2>
+        <p>MelodiJS includes a built-in router for Single Page Applications:</p>
 
-        <pre><code>const app = createApp({
-  store: {
-    user: { name: 'Alice' }
-  }
-})
+        <h3>Setup</h3>
+        <pre><code>import { createApp } from 'melodijs';
+import { MelodiRouter } from 'melodijs/router';
 
-// In any component:
-this.$store.user.name = 'Bob' // Reactive update!</code></pre>
+const router = new MelodiRouter({
+  routes: [
+    { path: '/', component: Home },
+    { path: '/about', component: About }
+  ]
+});
+
+const app = createApp({ /* ... */ });
+app.use(router);
+app.mount('#app');</code></pre>
+
+        <h3>Navigation</h3>
+        <pre><code>&lt;router-link to="/"&gt;Home&lt;/router-link&gt;
+&lt;router-link to="/about"&gt;About&lt;/router-link&gt;
+
+&lt;router-view&gt;&lt;/router-view&gt;</code></pre>
       </section>
 
+      <section id="transitions">
+        <h2>Transitions</h2>
+        <p>Add CSS transitions to elements with <code>v-if</code>:</p>
+
+        <h3>CSS Classes</h3>
+        <pre><code>.fade-enter-from, .fade-leave-to {
+  opacity: 0;
+}
+
+.fade-enter-active, .fade-leave-active {
+  transition: opacity 0.5s;
+}</code></pre>
+
+        <h3>Usage</h3>
+        <pre><code>&lt;transition name="fade"&gt;
+  &lt;div v-if="show"&gt;Hello&lt;/div&gt;
+&lt;/transition&gt;</code></pre>
+      </section>
+
+      <section id="store">
+        <h2>State Management (MelodiStore)</h2>
+        <p>Centralized state management with MelodiStore:</p>
+
+        <pre><code>import { MelodiStore } from 'melodijs/store';
+
+const store = new MelodiStore({
+  state: () => ({
+    count: 0,
+    user: null
+  }),
+  actions: {
+    increment() {
+      this.state.count++;
+    },
+    setUser(user) {
+      this.state.user = user;
+    }
+  },
+  getters: {
+    double: (state) => state.count * 2
+  }
+});
+
+app.use(store);</code></pre>
+
+        <h3>Using in Components</h3>
+        <pre><code>// Access state
+{{ $store.state.count }}
+
+// Use getters
+{{ $store.getters.double }}
+
+// Dispatch actions
+this.$store.dispatch('increment');</code></pre>
+      </section>
+
+      <section id="plugins">
+        <h2>Plugin System</h2>
+        <p>Extend MelodiJS with plugins:</p>
+
+        <h3>Using Plugins</h3>
+        <pre><code>import { createApp } from 'melodijs';
+import { MelodiRouter } from 'melodijs/router';
+
+const app = createApp({ /* ... */ });
+app.use(myPlugin, { /* options */ });
+app.mount('#app');</code></pre>
+
+        <h3>Creating Plugins</h3>
+        <pre><code>const myPlugin = {
+  install(app, options) {
+    // Add global components
+    app.components['my-component'] = { /* ... */ };
+    
+    // Add to app instance
+    app.myProperty = 'value';
+  }
+};</code></pre>
+      </section>
     </main>
   </div>
 
   <script>
-    // Theme Toggle Logic
+    // Theme toggle
     const themeToggle = document.getElementById('themeToggle');
     const html = document.documentElement;
-
-    // Check local storage or system preference
     const savedTheme = localStorage.getItem('theme');
     const systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
 
@@ -666,7 +812,7 @@ this.$store.user.name = 'Bob' // Reactive update!</code></pre>
       localStorage.setItem('theme', next);
     });
 
-    // Mobile Menu Logic
+    // Mobile menu
     const menuToggle = document.getElementById('menuToggle');
     const sidebar = document.getElementById('sidebar');
 
@@ -674,7 +820,6 @@ this.$store.user.name = 'Bob' // Reactive update!</code></pre>
       sidebar.classList.toggle('open');
     });
 
-    // Close sidebar when clicking a link on mobile
     document.querySelectorAll('.sidebar-link').forEach(link => {
       link.addEventListener('click', () => {
         if (window.innerWidth <= 960) {
@@ -683,7 +828,7 @@ this.$store.user.name = 'Bob' // Reactive update!</code></pre>
       });
     });
 
-    // Active Link Highlighting
+    // Active link highlighting
     const observer = new IntersectionObserver((entries) => {
       entries.forEach(entry => {
         if (entry.isIntersecting) {

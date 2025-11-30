@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MelodiJS - Watchers & Store Demo</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            padding: 20px;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            color: #42b983;
+        }
+
+        section {
+            border: 1px solid #ccc;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 5px;
+        }
+
+        button {
+            padding: 8px 15px;
+            margin: 5px;
+            cursor: pointer;
+        }
+
+        input {
+            padding: 5px;
+            margin: 5px;
+        }
+
+        .log {
+            background: #f4f4f4;
+            padding: 10px;
+            margin-top: 10px;
+            border-radius: 3px;
+        }
+
+        .log-entry {
+            margin: 5px 0;
+            font-family: monospace;
+            font-size: 12px;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="app">
+        <h1>MelodiJS - Watchers & Store Demo</h1>
+
+        <section>
+            <h2>Watchers Demo</h2>
+            <p>Username: <input v-model="username" placeholder="Type something..."></p>
+            <p>Current value: <strong>{{ username }}</strong></p>
+            <p>Character count: {{ usernameLength }}</p>
+
+            <h3>Watch Log</h3>
+            <div class="log">
+                <div v-for="(entry, index) in watchLog" :key="index" class="log-entry">
+                    {{ entry }}
+                </div>
+            </div>
+        </section>
+
+        <section>
+            <h2>MelodiStore Demo</h2>
+            <p>Counter: <strong>{{ $store.state.count }}</strong></p>
+            <p>Double: <strong>{{ $store.getters.double }}</strong></p>
+            <button @click="increment">Increment</button>
+            <button @click="decrement">Decrement</button>
+            <button @click="reset">Reset</button>
+        </section>
+    </div>
+
+    <script type="module">
+        import { createApp } from '../dist/melodijs.js';
+        import { MelodiStore } from '../dist/store.js';
+
+        // Create store
+        const store = new MelodiStore({
+            state: () => ({
+                count: 0
+            }),
+            actions: {
+                increment() {
+                    this.state.count++;
+                },
+                decrement() {
+                    this.state.count--;
+                },
+                reset() {
+                    this.state.count = 0;
+                }
+            },
+            getters: {
+                double: (state) => state.count * 2
+            }
+        });
+
+        const app = createApp({
+            data: () => ({
+                username: '',
+                watchLog: []
+            }),
+            computed: {
+                usernameLength() {
+                    return this.username.length;
+                }
+            },
+            watch: {
+                username: {
+                    handler(newVal, oldVal) {
+                        const timestamp = new Date().toLocaleTimeString();
+                        const logEntry = `[${timestamp}] Username changed: "${oldVal}" → "${newVal}"`;
+                        this.watchLog.push(logEntry);
+                        // Keep log to last 10 entries
+                        if (this.watchLog.length > 10) {
+                            this.watchLog.shift();
+                        }
+                    },
+                    immediate: false
+                }
+            },
+            methods: {
+                increment() {
+                    this.$store.dispatch    ('increment');
+                },
+                decrement() {
+                    this.$store.dispatch('decrement');
+                },
+                reset() {
+                    this.$store.dispatch('reset');
+                }
+            }
+        });
+
+        app.use(store);
+        app.mount('#app');
+    </script>
+</body>
+
+</html>

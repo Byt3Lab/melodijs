@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MelodiJS Computed Properties Test</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            padding: 20px;
+        }
+
+        .box {
+            border: 1px solid #ccc;
+            padding: 10px;
+            margin-bottom: 10px;
+            border-radius: 4px;
+        }
+
+        button {
+            cursor: pointer;
+            padding: 5px 10px;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>MelodiJS Computed Properties</h1>
+
+    <div id="root">
+        <app-root></app-root>
+    </div>
+
+    <script type="module">
+        import { createApp } from '../dist/melodijs.js'
+
+        const app = createApp({
+            components: {
+                'app-root': {
+                    template: `
+                        <div class="box">
+                            <h3>Basic Computed</h3>
+                            <p>Count: {{ count }}</p>
+                            <p>Double Count (computed): {{ doubleCount }}</p>
+                            <button @click="increment">Increment</button>
+                        </div>
+
+                        <div class="box">
+                            <h3>Dependent Computed</h3>
+                            <p>First Name: <input type="text" v-model="firstName"></p>
+                            <p>Last Name: <input type="text" v-model="lastName"></p>
+                            <p>Full Name (computed): {{ fullName }}</p>
+                        </div>
+                        
+                        <div class="box">
+                            <h3>List Computed</h3>
+                            <p>Items: <span v-for="item in items">{{ item }} </span></p>
+                            <p>Filtered Items (length > 5): <span v-for="item in filteredItems">{{ item }} </span></p>
+                            <input type="text" v-model="newItem" placeholder="Add item">
+                            <button @click="addItem">Add</button>
+                        </div>
+                    `,
+                    data() {
+                        return {
+                            count: 0,
+                            firstName: 'John',
+                            lastName: 'Doe',
+                            items: ['apple', 'banana', 'kiwi', 'orange'],
+                            newItem: ''
+                        }
+                    },
+                    computed: {
+                        doubleCount() {
+                            return this.count * 2;
+                        },
+                        fullName() {
+                            return this.firstName + ' ' + this.lastName;
+                        },
+                        filteredItems() {
+                            // Filter items with length > 5
+                            return this.items.filter(i => i.length > 5);
+                        }
+                    },
+                    methods: {
+                        increment() {
+                            this.count++;
+                        },
+                        addItem() {
+                            if (this.newItem) {
+                                this.items = [...this.items, this.newItem];
+                                this.newItem = '';
+                            }
+                        }
+                    }
+                }
+            }
+        });
+
+        app.mount('#root');
+    </script>
+</body>
+
+</html>

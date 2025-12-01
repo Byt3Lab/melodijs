@@ -171,17 +171,10 @@ export class MelodiRouter implements Plugin {
                             continue; // Try next sibling route
                         }
                     }
-                    // If no children, or children matching failed, this route is the final match if fullPath matches currentPath exactly
-                    if (fullPath === currentPath) {
-                        return true;
-                    } else {
-                        // If it has no children but it's not an exact match, backtrack
-                        matched.pop();
-                        for (const key in routeParams) {
-                            delete params[key];
-                        }
-                        continue; // Try next sibling route
-                    }
+                    // If no children, we found a match!
+                    // The _extractParams check already ensured that the path matches the pattern (including params)
+                    // and that the lengths are correct (unless partial match was requested, but here we are at a leaf).
+                    return true;
                 }
             }
             return false;

@@ -708,6 +708,84 @@ app.mount('#app');</code></pre>
 &lt;router-link to="/about"&gt;About&lt;/router-link&gt;
 
 &lt;router-view&gt;&lt;/router-view&gt;</code></pre>
+
+        <h3>Dynamic Route Matching</h3>
+        <p>We often need to map routes with the same component to different URLs. In MelodiJS, we can use a dynamic
+          segment in the path to achieve that.</p>
+        <pre><code>const router = new MelodiRouter({
+  routes: [
+    // dynamic segments start with a colon
+    { path: '/user/:id', component: User }
+  ]
+})</code></pre>
+        <p>Now, URLs like <code>/user/foo</code> and <code>/user/bar</code> will both map to the same route.</p>
+        <p>A dynamic segment is denoted by a colon <code>:</code>. When a route is matched, the value of the dynamic
+          segments will be exposed as <code>this.$router.params()</code> in every component.</p>
+        <pre><code>const User = {
+  template: '&lt;div&gt;User {{ $router.params().id }}&lt;/div&gt;',
+  hooks: {
+    mounted() {
+      console.log(this.$router.params().id)
+    }
+  }
+}</code></pre>
+
+        <h3>Programmatic Navigation</h3>
+        <p>Aside from using <code>&lt;router-link&gt;</code> for declarative navigation, you can do this
+          programmatically using the router instance.</p>
+        <pre><code>// literal string path
+this.$router.push('/home')
+
+// with params
+this.$router.push('/user/123')</code></pre>
+
+        <h3>Nested Routes</h3>
+        <p>Real applications often have multiple levels of nesting. MelodiJS router supports nested routes with the
+          <code>children</code> option:</p>
+        <pre><code>const router = new MelodiRouter({
+  routes: [
+    {
+      path: '/user/:id',
+      component: User,
+      children: [
+        { path: 'profile', component: UserProfile },
+        { path: 'posts', component: UserPosts }
+      ]
+    }
+  ]
+})</code></pre>
+        <p>The <code>User</code> component will need to include a <code>&lt;router-view&gt;</code> for the nested
+          routes:</p>
+        <pre><code>const User = {
+  template: `
+    &lt;div&gt;
+      &lt;h2&gt;User {{ $router.params().id }}&lt;/h2&gt;
+      &lt;router-view&gt;&lt;/router-view&gt;
+    &lt;/div&gt;
+  `
+}</code></pre>
+
+        <h3>Navigation Guards</h3>
+        <p>Use navigation guards to control navigation flow, such as authentication checks:</p>
+        <pre><code>router.beforeEach((to, from, next) => {
+  // Check authentication
+  if (to === '/admin' && !isAuthenticated()) {
+    next('/login'); // Redirect to login
+  } else {
+    next(); // Proceed with navigation
+  }
+});</code></pre>
+
+        <h3>Accessing Route Information</h3>
+        <p>Components can access current route information:</p>
+        <pre><code>// Current path
+this.$router.currentRoute()  // => '/user/123'
+
+// Route parameters
+this.$router.params()  // => { id: '123' }
+
+// Query parameters
+this.$router.query()  // => { tab: 'profile' }</code></pre>
       </section>
 
       <section id="transitions">
@@ -733,12 +811,14 @@ app.mount('#app');</code></pre>
         <h2>State Management (MelodiStore)</h2>
         <p>Centralized state management with MelodiStore:</p>
 
+        <h3>Setup</h3>
         <pre><code>import { MelodiStore } from 'melodijs/store';
 
 const store = new MelodiStore({
   state: () => ({
     count: 0,
-    user: null
+    user: null,
+    items: []
   }),
   actions: {
     increment() {
@@ -746,10 +826,14 @@ const store = new MelodiStore({
     },
     setUser(user) {
       this.state.user = user;
+    },
+    addItem(item) {
+      this.state.items.push(item);
     }
   },
   getters: {
-    double: (state) => state.count * 2
+    double: (state) => state.count * 2,
+    itemCount: (state) => state.items.length
   }
 });
 
@@ -764,6 +848,51 @@ app.use(store);</code></pre>
 
 // Dispatch actions
 this.$store.dispatch('increment');</code></pre>
+
+        <h3>Actions with Parameters</h3>
+        <p>Actions can accept parameters and access other actions via <code>this.dispatch</code>:</p>
+        <pre><code>actions: {
+  incrementBy(amount) {
+    this.state.count += amount;
+  },
+  async fetchUser(userId) {
+    const response = await fetch(`/api/users/${userId}`);
+    const user = await response.json();
+    this.dispatch('setUser', user);
+  }
+}</code></pre>
+
+        <h3>Deep Reactivity</h3>
+        <p>MelodiStore supports deep reactivity for nested objects and arrays:</p>
+        <pre><code>const store = new MelodiStore({
+  state: () => ({
+    user: {
+      profile: {
+        name: 'John',
+        age: 30
+      }
+    },
+    todos: [
+      { id: 1, text: 'Learn MelodiJS', done: false }
+    ]
+  }),
+  actions: {
+    updateUserName(name) {
+      // Deep reactivity - UI updates automatically
+      this.state.user.profile.name = name;
+    },
+    toggleTodo(id) {
+      const todo = this.state.todos.find(t => t.id === id);
+      if (todo) todo.done = !todo.done;
+    }
+  }
+});</code></pre>
+
+        <div class="tip">
+          <strong>Array Mutations</strong><br>
+          All array mutations (<code>push</code>, <code>pop</code>, <code>splice</code>, etc.) are tracked automatically
+          and trigger reactive updates.
+        </div>
       </section>
 
       <section id="plugins">

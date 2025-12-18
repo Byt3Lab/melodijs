@@ -707,14 +707,26 @@ export class Component {
 
     _processNodeList(nodes: NodeListOf<ChildNode> | Node[], scope: any = {}): DocumentFragment {
         const fragment = document.createDocumentFragment();
-        Array.from(nodes).forEach(node => {
+        const nodesArray = Array.from(nodes);
+
+        for (let i = 0; i < nodesArray.length; i++) {
+            const node = nodesArray[i];
+
+            // Check for v-if start
+            if (node.nodeType === 1 && (node as Element).hasAttribute('v-if')) {
+                const { anchor, nextIndex } = this._handleConditional(node as Element, nodesArray, i, scope);
+                fragment.appendChild(anchor);
+                i = nextIndex - 1; // Skip consumed nodes
+                continue;
+            }
+
             const processed = this._walk(node, scope);
             if (Array.isArray(processed)) {
                 processed.forEach(n => fragment.appendChild(n));
             } else if (processed) {
                 fragment.appendChild(processed);
             }
-        });
+        }
         return fragment;
     }
 
@@ -756,10 +768,10 @@ export class Component {
                 return clone;
             }
 
-            // Check for v-if
-            if (elNode.hasAttribute('v-if')) {
-                return this._handleVIf(elNode, scope);
-            }
+            // Check for v-if - REMOVED (Handled in _processNodeList)
+            // if (elNode.hasAttribute('v-if')) {
+            //    return this._handleVIf(elNode, scope);
+            // }
 
             // Check for v-for
             if (elNode.hasAttribute('v-for')) {
@@ -880,92 +892,144 @@ export class Component {
         return node.cloneNode(true);
     }
 
-    _handleVIf(node: Element, scope: any): Comment {
-        const anchor = document.createComment('v-if');
-        const expr = node.getAttribute('v-if')!;
+    _handleConditional(startNode: Element, nodes: Node[], startIndex: number, scope: any): { anchor: Comment, nextIndex: number } {
+        const anchor = document.createComment('v-if-chain');
+
+        // 1. Identify the chain
+        interface Branch {
+            type: 'if' | 'else-if' | 'else';
+            condition?: string;
+            node: Element;
+        }
+
+        const branches: Branch[] = [];
+
+        // First node is always v-if
+        branches.push({
+            type: 'if',
+            condition: startNode.getAttribute('v-if')!,
+            node: startNode
+        });
+
+        let currentIndex = startIndex + 1;
+
+        while (currentIndex < nodes.length) {
+            const node = nodes[currentIndex];
+
+            // Skip text nodes (whitespace) between branches
+            if (node.nodeType === 3 && !node.nodeValue?.trim()) {
+                currentIndex++;
+                continue;
+            }
+
+            if (node.nodeType === 1) {
+                const el = node as Element;
+                if (el.hasAttribute('v-else-if')) {
+                    branches.push({
+                        type: 'else-if',
+                        condition: el.getAttribute('v-else-if')!,
+                        node: el
+                    });
+                    currentIndex++;
+                    continue;
+                } else if (el.hasAttribute('v-else')) {
+                    branches.push({
+                        type: 'else',
+                        node: el
+                    });
+                    currentIndex++;
+                    // v-else must be the last one
+                    break;
+                }
+            }
+
+            // If we reach here, it's not part of the chain
+            break;
+        }
+
+        // 2. Create Effect
         let currentEl: Node | null = null;
 
-        // Defer the effect until mount so anchor has a parent
         const effectFn = () => {
             this._createEffect(() => {
-                const shouldShow = !!this._evalExpression(expr, scope);
-                // Check for transition parent
-                let transitionName: string | null = null;
-                if (anchor.parentNode && (anchor.parentNode as HTMLElement).dataset && (anchor.parentNode as HTMLElement).dataset.melodiTransition) {
-                    transitionName = (anchor.parentNode as HTMLElement).dataset.melodiTransition!;
+                let activeBranch: Branch | null = null;
+
+                // Find first matching branch
+                for (const branch of branches) {
+                    if (branch.type === 'else') {
+                        activeBranch = branch;
+                        break;
+                    }
+
+                    const val = this._evalExpression(branch.condition!, scope);
+                    if (!!val) {
+                        activeBranch = branch;
+                        break;
+                    }
                 }
 
-                if (shouldShow) {
-                    if (!currentEl) {
-                        const clone = node.cloneNode(true) as Element;
-                        clone.removeAttribute('v-if');
-                        const processed = this._walk(clone, scope);
+                // Render logic
+                if (activeBranch) {
+                    // If we are already showing this branch's node (cloned), do nothing?
+                    // No, we need to re-render if data changed, but _walk handles that recursion.
+                    // However, we are in an effect. If activeBranch changes, we swap.
+                    // If activeBranch is same, we might need to update? 
+                    // Actually, since we are inside an effect, if any dependency changes, this whole block runs.
+                    // We should check if the *rendered element* corresponds to the active branch.
+                    // But we don't track which branch created currentEl easily.
+                    // Simplest: Always unmount old, mount new. (Inefficient but correct for v1)
+                    // Optimization: If same branch, don't destroy/recreate.
 
-                        if (processed.nodeType === 11) {
-                            currentEl = processed; // Fragment handling is limited
-                        } else {
-                            currentEl = processed;
-                        }
+                    // For now, let's implement simple swap.
 
-                        if (anchor.parentNode) {
-                            // Transition Enter
-                            if (transitionName && currentEl && currentEl.nodeType === 1) {
-                                const el = currentEl as HTMLElement;
-                                el.classList.add(transitionName + '-enter-from');
-                                el.classList.add(transitionName + '-enter-active');
-                                anchor.parentNode.insertBefore(currentEl, anchor);
-
-                                requestAnimationFrame(() => {
-                                    el.classList.remove(transitionName + '-enter-from');
-                                    el.classList.add(transitionName + '-enter-to');
-                                    const onEnd = () => {
-                                        el.classList.remove(transitionName + '-enter-active');
-                                        el.classList.remove(transitionName + '-enter-to');
-                                        el.removeEventListener('transitionend', onEnd);
-                                    };
-                                    el.addEventListener('transitionend', onEnd);
-                                });
-                            } else {
-                                anchor.parentNode.insertBefore(currentEl, anchor);
-                            }
-                        }
-                    }
-                } else {
+                    // Clean up previous
                     if (currentEl) {
                         const elToRemove = currentEl;
-                        currentEl = null;
-
-                        if (transitionName && elToRemove.nodeType === 1 && elToRemove.parentNode) {
-                            // Transition Leave
-                            const el = elToRemove as HTMLElement;
-                            el.classList.add(transitionName + '-leave-from');
-                            el.classList.add(transitionName + '-leave-active');
-
-                            requestAnimationFrame(() => {
-                                el.classList.remove(transitionName + '-leave-from');
-                                el.classList.add(transitionName + '-leave-to');
-                                const onEnd = () => {
-                                    el.classList.remove(transitionName + '-leave-active');
-                                    el.classList.remove(transitionName + '-leave-to');
-                                    if (el.parentNode) el.parentNode.removeChild(el);
-                                    el.removeEventListener('transitionend', onEnd);
-                                };
-                                el.addEventListener('transitionend', onEnd);
-                            });
-                        } else {
-                            if (elToRemove.nodeType === 11) {
-                                // Fragment
-                            } else if (elToRemove.parentNode) {
-                                elToRemove.parentNode.removeChild(elToRemove);
-                            }
+                        currentEl = null; // Clear ref first
+                        if (elToRemove.parentNode) {
+                            elToRemove.parentNode.removeChild(elToRemove);
                         }
+                    }
+
+                    // Mount new
+                    const clone = activeBranch.node.cloneNode(true) as Element;
+                    clone.removeAttribute('v-if');
+                    clone.removeAttribute('v-else-if');
+                    clone.removeAttribute('v-else');
+
+                    const processed = this._walk(clone, scope);
+
+                    if (processed.nodeType === 11) {
+                        // Fragment handling
+                        // We need a single reference for currentEl to remove it later.
+                        // If fragment, we might need a wrapper or track all nodes.
+                        // For simplicity in this fix, let's assume single element or wrap in text?
+                        // _walk returns Node | DocumentFragment.
+                        // If fragment, we can't easily track "currentEl" as a single node.
+                        // But v-if usually is on an Element, so _walk(element) usually returns Element.
+                        // Unless the element contains only text? No, _walk(element) returns element.
+                        currentEl = processed;
+                    } else {
+                        currentEl = processed;
+                    }
+
+                    if (anchor.parentNode && currentEl) {
+                        anchor.parentNode.insertBefore(currentEl, anchor);
+                    }
+
+                } else {
+                    // No branch active
+                    if (currentEl) {
+                        if (currentEl.parentNode) currentEl.parentNode.removeChild(currentEl);
+                        currentEl = null;
                     }
                 }
             });
         };
 
         this._postMountEffects.push(effectFn);
-        return anchor;
+
+        return { anchor, nextIndex: currentIndex };
     }
 
     _handleVFor(node: Element, scope: any): Comment {

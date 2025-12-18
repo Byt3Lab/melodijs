@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MelodiJS v-if Repro</title>
+    <style>
+        .error {
+            color: red;
+        }
+
+        .success {
+            color: green;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="app">
+        <h1>v-if / v-else Reproduction</h1>
+
+        <div class="test-case">
+            <h2>Basic v-if/v-else</h2>
+            <button @click="toggleShow">Toggle Show (Current: {{ show }})</button>
+            <p v-if="show" id="msg-if">This is TRUE</p>
+            <p v-else id="msg-else">This is FALSE</p>
+        </div>
+
+        <div class="test-case">
+            <h2>Nested v-if</h2>
+            <button @click="toggleParent">Toggle Parent (Current: {{ parentCondition }})</button>
+            <button @click="toggleChild">Toggle Child (Current: {{ childCondition }})</button>
+
+            <div v-if="parentCondition" id="parent-if">
+                Parent is TRUE
+                <div v-if="childCondition" id="child-if">
+                    Child is TRUE
+                </div>
+                <div v-else id="child-else">
+                    Child is FALSE
+                </div>
+            </div>
+            <div v-else id="parent-else">
+                Parent is FALSE
+            </div>
+        </div>
+
+        <div class="test-case">
+            <h2>v-else-if</h2>
+            <button @click="cycleType">Cycle Type (Current: {{ type }})</button>
+            <p v-if="type === 'A'" id="type-a">Type is A</p>
+            <p v-else-if="type === 'B'" id="type-b">Type is B</p>
+            <p v-else-if="type === 'C'" id="type-c">Type is C</p>
+            <p v-else id="type-other">Type is Other</p>
+        </div>
+    </div>
+
+    <script type="module">
+        import { MelodiJS } from '../dist/melodijs.js';
+
+        new MelodiJS({
+            el: '#app',
+            data: () => ({
+                show: true,
+                parentCondition: true,
+                childCondition: true,
+                type: 'A'
+            }),
+            methods: {
+                toggleShow() {
+                    this.show = !this.show;
+                },
+                toggleParent() {
+                    this.parentCondition = !this.parentCondition;
+                },
+                toggleChild() {
+                    this.childCondition = !this.childCondition;
+                },
+                cycleType() {
+                    const types = ['A', 'B', 'C', 'D'];
+                    const idx = types.indexOf(this.type);
+                    this.type = types[(idx + 1) % types.length];
+                }
+            }
+        }).mount('#app');
+    </script>
+</body>
+
+</html>

@@ -4,6 +4,7 @@ export interface RouteDef {
     path: string;
     component: ComponentDef;
     children?: RouteDef[];
+    transition?: string;
 }
 
 export class MelodiRouter implements Plugin {
@@ -277,36 +278,117 @@ export class MelodiRouter implements Plugin {
                     console.log('RouterView mounted. Depth:', depth);
 
                     let currentComponent: Component | null = null;
+                    let currentWrapper: HTMLElement | null = null;
 
                     // Create an effect that runs whenever matched routes change
                     app.reactivity.createEffect(() => {
                         const matched = router.matched();
                         console.log('RouterView update. Depth:', depth, 'Matched:', matched);
                         const route = matched[depth];
+                        const transitionName = route ? route.transition : null;
 
-                        // Clear previous content
-                        container.innerHTML = '';
-                        if (currentComponent) {
-                            try {
-                                currentComponent.unmount();
-                            } catch (e) {
-                                console.error('Error unmounting component:', e);
+                        // Function to mount new component
+                        const mountNew = (wrapper: HTMLElement) => {
+                            if (route) {
+                                try {
+                                    const comp = new Component(route.component);
+                                    comp.mount(wrapper, app);
+                                    return comp;
+                                } catch (e) {
+                                    console.error('Error mounting route component:', e);
+                                    wrapper.innerHTML = '<div>Error loading component</div>';
+                                    return null;
+                                }
                             }
-                            currentComponent = null;
-                        }
+                            return null;
+                        };
 
-                        if (route) {
-                            // Mount new component
-                            try {
-                                const comp = new Component(route.component);
-                                comp.mount(container, app);
-                                currentComponent = comp;
-                            } catch (e) {
-                                console.error('Error mounting route component:', e);
-                                container.innerHTML = '<div>Error loading component</div>';
+                        if (transitionName) {
+                            // --- Transition Logic ---
+
+                            // 1. Prepare new component
+                            const newWrapper = document.createElement('div');
+                            newWrapper.className = `route-wrapper`;
+                            // Add enter classes
+                            newWrapper.classList.add(`${transitionName}-enter-from`);
+                            newWrapper.classList.add(`${transitionName}-enter-active`);
+
+                            container.appendChild(newWrapper);
+                            const newComp = mountNew(newWrapper);
+
+                            // 2. Handle old component (Leave)
+                            if (currentWrapper) {
+                                const oldWrapper = currentWrapper;
+                                const oldComp = currentComponent;
+
+                                oldWrapper.classList.add(`${transitionName}-leave-from`);
+                                oldWrapper.classList.add(`${transitionName}-leave-active`);
+
+                                // Force reflow
+                                void oldWrapper.offsetWidth;
+
+                                // Next frame
+                                requestAnimationFrame(() => {
+                                    oldWrapper.classList.remove(`${transitionName}-leave-from`);
+                                    oldWrapper.classList.add(`${transitionName}-leave-to`);
+                                });
+
+                                // Cleanup after transition
+                                const onTransitionEnd = () => {
+                                    if (oldWrapper.parentNode === container) {
+                                        container.removeChild(oldWrapper);
+                                    }
+                                    if (oldComp) {
+                                        try { oldComp.unmount(); } catch (e) { }
+                                    }
+                                };
+
+                                // Fallback timeout
+                                setTimeout(onTransitionEnd, 500); // Default fallback
+                                oldWrapper.addEventListener('transitionend', onTransitionEnd, { once: true });
                             }
+
+                            // 3. Handle new component (Enter)
+                            // Force reflow
+                            void newWrapper.offsetWidth;
+
+                            requestAnimationFrame(() => {
+                                newWrapper.classList.remove(`${transitionName}-enter-from`);
+                                newWrapper.classList.add(`${transitionName}-enter-to`);
+
+                                const onEnterEnd = () => {
+                                    newWrapper.classList.remove(`${transitionName}-enter-active`);
+                                    newWrapper.classList.remove(`${transitionName}-enter-to`);
+                                };
+                                setTimeout(onEnterEnd, 500);
+                                newWrapper.addEventListener('transitionend', onEnterEnd, { once: true });
+                            });
+
+                            currentComponent = newComp;
+                            currentWrapper = newWrapper;
+
                         } else {
-                            // If no route matched at this depth, render nothing
+                            // --- No Transition (Instant) ---
+
+                            // Clear previous content
+                            container.innerHTML = '';
+                            if (currentComponent) {
+                                try {
+                                    currentComponent.unmount();
+                                } catch (e) {
+                                    console.error('Error unmounting component:', e);
+                                }
+                                currentComponent = null;
+                            }
+                            currentWrapper = null;
+
+                            if (route) {
+                                const wrapper = document.createElement('div');
+                                wrapper.className = 'route-wrapper';
+                                container.appendChild(wrapper);
+                                currentComponent = mountNew(wrapper);
+                                currentWrapper = wrapper;
+                            }
                         }
                     });
                 }

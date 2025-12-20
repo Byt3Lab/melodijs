@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>MelodiJS Router Transition Test</title>
+    <style>
+        body {
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #1a1a1a;
+            color: #ffffff;
+            overflow-x: hidden;
+        }
+
+        .nav {
+            padding: 20px;
+            background: #2a2a2a;
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+            z-index: 100;
+            position: relative;
+        }
+
+        .nav a {
+            text-decoration: none;
+            color: #e0e0e0;
+            padding: 8px 16px;
+            border-radius: 6px;
+            transition: background 0.2s;
+            font-weight: 500;
+        }
+
+        .nav a:hover {
+            background: #3a3a3a;
+            color: #fff;
+        }
+
+        .router-view-container {
+            position: relative;
+            width: 100%;
+            height: calc(100vh - 70px);
+            /* Subtract nav height */
+            overflow: hidden;
+        }
+
+        .route-wrapper {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            padding: 40px;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+            background: linear-gradient(45deg, #ff6b6b, #feca57);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        p {
+            font-size: 1.1rem;
+            color: #aaa;
+            max-width: 600px;
+            text-align: center;
+            line-height: 1.6;
+        }
+
+        button {
+            margin-top: 20px;
+            padding: 10px 20px;
+            background: #4a4a4a;
+            border: none;
+            border-radius: 4px;
+            color: white;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: transform 0.1s, background 0.2s;
+        }
+
+        button:hover {
+            background: #5a5a5a;
+            transform: scale(1.05);
+        }
+
+        button:active {
+            transform: scale(0.95);
+        }
+
+        /* Fade Transition */
+        .fade-enter-active,
+        .fade-leave-active {
+            transition: opacity 0.4s ease, transform 0.4s ease;
+        }
+
+        .fade-enter-from {
+            opacity: 0;
+            transform: scale(0.95);
+        }
+
+        .fade-leave-to {
+            opacity: 0;
+            transform: scale(1.05);
+        }
+
+        /* Slide Transition */
+        .slide-enter-active,
+        .slide-leave-active {
+            transition: transform 0.4s cubic-bezier(0.25, 1, 0.5, 1);
+        }
+
+        .slide-enter-from {
+            transform: translateX(100%);
+        }
+
+        .slide-leave-to {
+            transform: translateX(-100%);
+        }
+
+        .page-a {
+            background: radial-gradient(circle at top, #2a2a2a, #1a1a1a);
+        }
+
+        .page-b {
+            background: radial-gradient(circle at top, #2c3e50, #1a1a1a);
+        }
+
+        .page-c {
+            background: radial-gradient(circle at top, #4a2c2c, #1a1a1a);
+        }
+    </style>
+</head>
+
+<body>
+    <div id="app">
+        <div class="nav">
+            <router-link to="/">Home</router-link>
+            <router-link to="/about">About</router-link>
+            <router-link to="/contact">Contact</router-link>
+        </div>
+
+        <router-view></router-view>
+    </div>
+
+    <script type="module">
+        import { createApp } from '../dist/melodijs.js';
+        import { MelodiRouter } from '../dist/router.js';
+
+        const Home = {
+            template: `
+                <div class="page page-a">
+                    <h1>Home Page</h1>
+                    <p>Welcome to the home page. This page uses a <strong>Fade</strong> transition.</p>
+                    <button @click="goToAbout">Go to About (Programmatic)</button>
+                </div>
+            `,
+            methods: {
+                goToAbout() {
+                    this.$router.push('/about');
+                }
+            }
+        };
+
+        const About = {
+            template: `
+                <div class="page page-b">
+                    <h1>About Page</h1>
+                    <p>This is the about page. It also uses a <strong>Fade</strong> transition.</p>
+                    <div style="display: flex; gap: 10px;">
+                        <button @click="goHome">Back Home</button>
+                        <button @click="goToContact">Go to Contact</button>
+                    </div>
+                </div>
+            `,
+            methods: {
+                goHome() {
+                    this.$router.push('/');
+                },
+                goToContact() {
+                    this.$router.push('/contact');
+                }
+            }
+        };
+
+        const Contact = {
+            template: `
+                <div class="page page-c">
+                    <h1>Contact Page</h1>
+                    <p>This page uses a <strong>Slide</strong> transition. Notice how it slides in from the right.</p>
+                    <button @click="goBack">Go Back (About)</button>
+                </div>
+            `,
+            methods: {
+                goBack() {
+                    this.$router.push('/about');
+                }
+            }
+        };
+
+        const router = new MelodiRouter({
+            routes: [
+                { path: '/', component: Home, transition: 'fade' },
+                { path: '/about', component: About, transition: 'fade' },
+                { path: '/contact', component: Contact, transition: 'slide' }
+            ]
+        });
+
+        const app = createApp();
+
+        app.use(router);
+        app.mount('#app');
+    </script>
+</body>
+
+</html>

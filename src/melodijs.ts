@@ -1032,6 +1032,11 @@ export class Component {
                         effects.forEach(fn => fn());
                     }
 
+                    // Mount nested components in newly inserted content
+                    if (currentEl && currentEl.nodeType === 1) {
+                        this._mountComponentsIn(currentEl as Element);
+                    }
+
                 } else {
                     // No branch active
                     if (currentEl) {
@@ -1099,9 +1104,19 @@ export class Component {
                             if (children.length > 0) {
                                 itemMap.set(index, { element: children[0], item, index });
                             }
+                            // Mount nested components in each child
+                            children.forEach(child => {
+                                if (child.nodeType === 1) {
+                                    this._mountComponentsIn(child as Element);
+                                }
+                            });
                         } else {
                             parent.insertBefore(processed, anchor);
                             itemMap.set(index, { element: processed, item, index });
+                            // Mount nested components in newly inserted element
+                            if (processed.nodeType === 1) {
+                                this._mountComponentsIn(processed as Element);
+                            }
                         }
                     };
 
@@ -1231,6 +1246,10 @@ export class Component {
                             }
 
                             itemMap.set(key, { element: elementToTrack, item: newData.item, index: newData.index });
+                            // Mount nested components in newly created element
+                            if (elementToTrack && elementToTrack.nodeType === 1) {
+                                this._mountComponentsIn(elementToTrack as Element);
+                            }
                         }
                     });
                 }
@@ -1375,6 +1394,69 @@ export class Component {
                     (node as any).__melodijs_mounted = true
                 } catch (e) {
                     console.error('Error mounting nested component:', tag, e)
+                }
+            }
+        }
+    }
+
+    /**
+     * Mount nested components within a specific DOM node.
+     * This is called after v-for or v-if dynamically inserts new nodes.
+     */
+    async _mountComponentsIn(node: Element): Promise<void> {
+        if (!this.app || !node) return;
+
+        // Merge global and local components
+        const globalComponents = this.app.components || {};
+        const localComponents = this.components || {};
+        const allComponents = { ...globalComponents, ...localComponents };
+
+        const tags = Object.keys(allComponents);
+        for (const tag of tags) {
+            // Check if node itself is the component
+            if (node.tagName && node.tagName.toLowerCase() === tag) {
+                if (!(node as any).__melodijs_mounted) {
+                    const compDef = allComponents[tag];
+                    const comp = new Component(compDef);
+                    try { comp._parent = this; } catch (e) { }
+                    try {
+                        await comp.mount(node, this.app);
+                        (node as any).__melodijs_mounted = true;
+                    } catch (e) {
+                        console.error('Error mounting component:', tag, e);
+                    }
+                }
+            }
+
+            // Check for nested components inside node
+            const nodes: Element[] = Array.from(node.querySelectorAll(tag));
+            for (const childNode of nodes) {
+                if ((childNode as any).__melodijs_mounted) continue;
+
+                // Check if this node is inside another custom element that is NOT yet mounted
+                let parent = childNode.parentElement;
+                let skip = false;
+                while (parent && parent !== node) {
+                    const t = parent.tagName && parent.tagName.toLowerCase();
+                    if (t && tags.indexOf(t) !== -1) {
+                        // Found a custom element parent - skip only if NOT mounted yet
+                        if (!(parent as any).__melodijs_mounted) {
+                            skip = true;
+                            break;
+                        }
+                    }
+                    parent = parent.parentElement;
+                }
+
+                if (skip) continue;
+                const compDef = allComponents[tag];
+                const comp = new Component(compDef);
+                try { comp._parent = this; } catch (e) { }
+                try {
+                    await comp.mount(childNode, this.app);
+                    (childNode as any).__melodijs_mounted = true;
+                } catch (e) {
+                    console.error('Error mounting nested component:', tag, e);
                 }
             }
         }

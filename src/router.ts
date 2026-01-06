@@ -7,8 +7,14 @@ export interface RouteDef {
     transition?: string;
 }
 
+export interface RouterOptions {
+    routes: RouteDef[];
+    mode?: 'hash' | 'history';  // Default: 'hash'
+}
+
 export class MelodiRouter implements Plugin {
     routes: RouteDef[];
+    mode: 'hash' | 'history';
     currentRoute: any; // Signal
     setRoute: any; // Signal setter
     params: any; // Route params signal
@@ -19,8 +25,9 @@ export class MelodiRouter implements Plugin {
     setMatched: any;
     beforeEachHook: ((to: string, from: string, next: (path?: string) => void) => void) | null = null;
 
-    constructor(options: { routes: RouteDef[] }) {
+    constructor(options: RouterOptions) {
         this.routes = options.routes;
+        this.mode = options.mode || 'hash';  // Default to hash mode
         this.currentRoute = null;
         this.setRoute = null;
         this.params = null;
@@ -51,10 +58,16 @@ export class MelodiRouter implements Plugin {
         this.matched = readMatched;
         this.setMatched = writeMatched;
 
-        // Listen to hash changes
-        window.addEventListener('hashchange', () => {
-            this._handleRouteChange();
-        });
+        // Listen to route changes based on mode
+        if (this.mode === 'history') {
+            window.addEventListener('popstate', () => {
+                this._handleRouteChange();
+            });
+        } else {
+            window.addEventListener('hashchange', () => {
+                this._handleRouteChange();
+            });
+        }
 
         // Initial route
         this._handleRouteChange();
@@ -83,17 +96,27 @@ export class MelodiRouter implements Plugin {
     }
 
     _getCurrentPath(): string {
+        if (this.mode === 'history') {
+            return window.location.pathname || '/';
+        }
         const hash = window.location.hash.slice(1);
         return hash.split('?')[0] || '/';
     }
 
     _getCurrentQuery(): Record<string, string> {
-        const hash = window.location.hash.slice(1);
-        const queryPart = hash.split('?')[1];
-        if (!queryPart) return {};
+        let queryString: string;
+
+        if (this.mode === 'history') {
+            queryString = window.location.search.slice(1);  // Remove leading '?'
+        } else {
+            const hash = window.location.hash.slice(1);
+            queryString = hash.split('?')[1] || '';
+        }
+
+        if (!queryString) return {};
 
         const query: Record<string, string> = {};
-        queryPart.split('&').forEach(pair => {
+        queryString.split('&').forEach(pair => {
             const [key, value] = pair.split('=');
             if (key) query[decodeURIComponent(key)] = decodeURIComponent(value || '');
         });
@@ -101,7 +124,22 @@ export class MelodiRouter implements Plugin {
     }
 
     push(path: string) {
-        window.location.hash = path;
+        if (this.mode === 'history') {
+            window.history.pushState({}, '', path);
+            this._handleRouteChange();
+        } else {
+            window.location.hash = path;
+        }
+    }
+
+    replace(path: string) {
+        if (this.mode === 'history') {
+            window.history.replaceState({}, '', path);
+            this._handleRouteChange();
+        } else {
+            const url = window.location.href.split('#')[0];
+            window.location.replace(url + '#' + path);
+        }
     }
 
     _handleRouteChange() {
@@ -234,12 +272,19 @@ export class MelodiRouter implements Plugin {
             template: '<a :href="href" @click="navigate"><slot></slot></a>',
             computed: {
                 href() {
+                    if (router.mode === 'history') {
+                        return (this as any).to;
+                    }
                     return '#' + (this as any).to;
                 }
             },
             methods: {
                 navigate(e: Event) {
-                    // Default behavior of anchor with hash is fine
+                    if (router.mode === 'history') {
+                        e.preventDefault();
+                        router.push((this as any).to);
+                    }
+                    // In hash mode, default browser behavior handles navigation
                 }
             }
         };

@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Dynamic Component Mounting</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            min-height: 100vh;
+            padding: 2rem;
+            color: #fff;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            text-align: center;
+            margin-bottom: 2rem;
+            font-size: 2rem;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .test-section {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 16px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .test-section h2 {
+            color: #667eea;
+            margin-bottom: 1rem;
+            font-size: 1.25rem;
+        }
+
+        .status {
+            padding: 1rem;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+            font-family: monospace;
+        }
+
+        .status.success {
+            background: rgba(16, 185, 129, 0.2);
+            border: 1px solid #10b981;
+        }
+
+        .status.error {
+            background: rgba(239, 68, 68, 0.2);
+            border: 1px solid #ef4444;
+        }
+
+        .status.pending {
+            background: rgba(245, 158, 11, 0.2);
+            border: 1px solid #f59e0b;
+        }
+
+        button {
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            margin-right: 0.5rem;
+            margin-bottom: 0.5rem;
+            transition: transform 0.2s;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+        }
+
+        .project-list {
+            list-style: none;
+            margin-top: 1rem;
+        }
+
+        .project-list li {
+            padding: 1rem;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 8px;
+            margin-bottom: 0.5rem;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .custom-link {
+            color: #667eea;
+            text-decoration: underline;
+            cursor: pointer;
+        }
+
+        .log {
+            font-family: monospace;
+            font-size: 0.875rem;
+            background: rgba(0, 0, 0, 0.3);
+            padding: 1rem;
+            border-radius: 8px;
+            max-height: 200px;
+            overflow-y: auto;
+            margin-top: 1rem;
+        }
+
+        .log-entry {
+            padding: 0.25rem 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .log-entry.success {
+            color: #10b981;
+        }
+
+        .log-entry.error {
+            color: #ef4444;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>🧪 Test Dynamic Component Mounting</h1>
+
+        <div class="test-section">
+            <h2>Test 1: Component in v-for (simulates data fetching)</h2>
+            <test-vfor-component></test-vfor-component>
+        </div>
+
+        <div class="test-section">
+            <h2>Test 2: Component in v-if (conditional rendering)</h2>
+            <test-vif-component></test-vif-component>
+        </div>
+
+        <div class="test-section">
+            <h2>Test Results</h2>
+            <div id="test-results"></div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { createApp } from '../dist/melodijs.js';
+
+        // Track test results
+        const testResults = [];
+
+        function logResult(name, passed, message) {
+            testResults.push({ name, passed, message });
+            updateResultsDisplay();
+        }
+
+        function updateResultsDisplay() {
+            const container = document.getElementById('test-results');
+            container.innerHTML = testResults.map(r => `
+                <div class="log-entry ${r.passed ? 'success' : 'error'}">
+                    ${r.passed ? '✅' : '❌'} ${r.name}: ${r.message}
+                </div>
+            `).join('');
+        }
+
+        const app = createApp({
+            components: {
+                // A simple custom component to test mounting
+                'my-link': {
+                    props: ['to', 'label'],
+                    template: `<a class="custom-link" :href="to">{{ label }}</a>`,
+                    hooks: {
+                        mounted() {
+                            console.log('[my-link] Mounted with to=', this.to, 'label=', this.label);
+                        }
+                    }
+                },
+
+                // Test component that uses v-for with data loaded after mount
+                'test-vfor-component': {
+                    template: `
+                        <div>
+                            <div class="status" :class="statusClass">{{ statusText }}</div>
+                            <button @click="loadData">Load Data</button>
+                            <button @click="addItem">Add Item</button>
+                            <button @click="checkMounted">Verify Mounted</button>
+                            <ul class="project-list">
+                                <li v-for="project in projects" :key="project.id">
+                                    <span>#{{ project.id }}</span>
+                                    <my-link :to="project.url" :label="project.name"></my-link>
+                                </li>
+                            </ul>
+                            <div class="log">
+                                <div v-for="entry in log" class="log-entry">{{ entry }}</div>
+                            </div>
+                        </div>
+                    `,
+                    data() {
+                        return {
+                            projects: [],
+                            nextId: 1,
+                            statusText: 'No data loaded yet',
+                            statusClass: 'pending',
+                            log: []
+                        };
+                    },
+                    methods: {
+                        loadData() {
+                            this.log.push('Loading data...');
+                            // Simulate async data fetch
+                            setTimeout(() => {
+                                this.projects = [
+                                    { id: this.nextId++, name: 'Project Alpha', url: '/projects/alpha' },
+                                    { id: this.nextId++, name: 'Project Beta', url: '/projects/beta' },
+                                    { id: this.nextId++, name: 'Project Gamma', url: '/projects/gamma' }
+                                ];
+                                this.projects = [...this.projects]; // Trigger reactivity
+                                this.log.push('Data loaded: ' + this.projects.length + ' projects');
+                                this.log = [...this.log];
+                                this.statusText = 'Data loaded, check if my-link components are mounted';
+
+                                // Check mounting after a brief delay
+                                setTimeout(() => this.checkMounted(), 100);
+                            }, 500);
+                        },
+                        addItem() {
+                            this.projects.push({
+                                id: this.nextId++,
+                                name: 'Project ' + this.nextId,
+                                url: '/projects/' + this.nextId
+                            });
+                            this.projects = [...this.projects];
+                            this.log.push('Added new project #' + (this.nextId - 1));
+                            this.log = [...this.log];
+
+                            // Check mounting after a brief delay
+                            setTimeout(() => this.checkMounted(), 100);
+                        },
+                        checkMounted() {
+                            const links = document.querySelectorAll('test-vfor-component my-link');
+                            let allMounted = true;
+                            let mountedCount = 0;
+
+                            links.forEach(link => {
+                                if (link.__melodijs_mounted) {
+                                    mountedCount++;
+                                } else {
+                                    allMounted = false;
+                                }
+                            });
+
+                            const message = `${mountedCount}/${links.length} my-link components mounted`;
+                            this.log.push('Verification: ' + message);
+                            this.log = [...this.log];
+
+                            if (links.length > 0 && allMounted) {
+                                this.statusText = '✅ All ' + links.length + ' my-link components are mounted!';
+                                this.statusClass = 'success';
+                                logResult('v-for component mounting', true, message);
+                            } else if (links.length === 0) {
+                                this.statusText = '⚠️ No my-link elements found (load data first)';
+                                this.statusClass = 'pending';
+                            } else {
+                                this.statusText = '❌ Some my-link components are NOT mounted: ' + message;
+                                this.statusClass = 'error';
+                                logResult('v-for component mounting', false, message);
+                            }
+                        }
+                    }
+                },
+
+                // Test component that uses v-if with dynamic switching
+                'test-vif-component': {
+                    template: `
+                        <div>
+                            <div class="status" :class="statusClass">{{ statusText }}</div>
+                            <button @click="showContent = !showContent">Toggle Content</button>
+                            <button @click="checkMounted">Verify Mounted</button>
+                            <div v-if="showContent">
+                                <p>Content is visible!</p>
+                                <my-link to="/home" label="Home Link"></my-link>
+                            </div>
+                            <div v-else>
+                                <p>Content is hidden</p>
+                            </div>
+                            <div class="log">
+                                <div v-for="entry in log" class="log-entry">{{ entry }}</div>
+                            </div>
+                        </div>
+                    `,
+                    data() {
+                        return {
+                            showContent: false,
+                            statusText: 'Toggle content to show my-link',
+                            statusClass: 'pending',
+                            log: []
+                        };
+                    },
+                    methods: {
+                        checkMounted() {
+                            const links = document.querySelectorAll('test-vif-component my-link');
+
+                            if (!this.showContent) {
+                                this.log.push('Content is hidden, no my-link expected');
+                                this.log = [...this.log];
+                                return;
+                            }
+
+                            let allMounted = true;
+                            let mountedCount = 0;
+
+                            links.forEach(link => {
+                                if (link.__melodijs_mounted) {
+                                    mountedCount++;
+                                } else {
+                                    allMounted = false;
+                                }
+                            });
+
+                            const message = `${mountedCount}/${links.length} my-link components mounted`;
+                            this.log.push('Verification: ' + message);
+                            this.log = [...this.log];
+
+                            if (links.length > 0 && allMounted) {
+                                this.statusText = '✅ my-link component in v-if is mounted!';
+                                this.statusClass = 'success';
+                                logResult('v-if component mounting', true, message);
+                            } else if (links.length === 0) {
+                                this.statusText = '⚠️ No my-link elements found';
+                                this.statusClass = 'pending';
+                            } else {
+                                this.statusText = '❌ my-link component NOT mounted: ' + message;
+                                this.statusClass = 'error';
+                                logResult('v-if component mounting', false, message);
+                            }
+                        }
+                    },
+                    hooks: {
+                        mounted() {
+                            // Auto-test: toggle content on and check after delay
+                            setTimeout(() => {
+                                this.showContent = true;
+                                setTimeout(() => this.checkMounted(), 100);
+                            }, 1000);
+                        }
+                    }
+                }
+            }
+        });
+
+        app.mount('.container').then(() => {
+            console.log('App mounted!');
+
+            // Auto-run tests after mount
+            setTimeout(() => {
+                // Trigger loadData on the v-for test component
+                const vforComponent = document.querySelector('test-vfor-component');
+                if (vforComponent && vforComponent.__melodijs_mounted) {
+                    // The mounted hook will trigger the test
+                }
+            }, 500);
+        });
+    </script>
+</body>
+
+</html>

@@ -240,6 +240,11 @@ export class MelodiRouter implements Plugin {
             const patternPart = patternParts[i];
             const pathPart = pathParts[i];
 
+            if (patternPart === '*') {
+                params['pathMatch'] = '/' + pathParts.slice(i).join('/');
+                return params;
+            }
+
             if (patternPart.startsWith(':')) {
                 const paramName = patternPart.slice(1);
                 if (pathPart === undefined) return null; // Path is shorter than pattern for a param

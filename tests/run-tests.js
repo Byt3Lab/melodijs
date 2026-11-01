@@ -12,7 +12,10 @@ function fail(msg){
 
 async function run(){
   // module path used by tests
-  const modPath = pathToFileURL(path.join(__dirname, '..', 'melodijs.js')).href
+  const distPath = path.join(__dirname, '..', 'dist', 'melodijs.js')
+  const rootPath = path.join(__dirname, '..', 'melodijs.js')
+  const targetFile = fs.existsSync(distPath) ? distPath : rootPath
+  const modPath = pathToFileURL(targetFile).href
 
   // --- TEST v-if ---
   const domIf = new JSDOM(`<!doctype html><html><body><div id="app"><test-if></test-if></div></body></html>`, { runScripts: 'outside-only' })
@@ -166,6 +169,55 @@ async function run(){
   await new Promise(r => setTimeout(r, 0))
 
   if (!show.textContent.includes('1')) fail('expected store to be 1 after click')
+
+  // --- TEST Custom delimiters ---
+  const domDelim = new JSDOM(`<!doctype html><html><body><div id="app">Hello [[ name ]]</div></body></html>`, { runScripts: 'outside-only' })
+  global.window = domDelim.window
+  global.document = domDelim.window.document
+  global.HTMLElement = domDelim.window.HTMLElement
+  const { createApp: createAppDelim } = await import(modPath)
+  const appDelim = createAppDelim({
+    delimiters: ['[[', ']]'],
+    data() { return { name: 'Melodi' } }
+  })
+  await appDelim.mount('#app')
+  if (!domDelim.window.document.getElementById('app').textContent.includes('Hello Melodi')) {
+    fail('custom delimiters: expected "Hello Melodi" but got ' + domDelim.window.document.getElementById('app').textContent)
+  }
+
+  // --- TEST Event modifiers (@click.stop & @click.prevent) ---
+  const domMod = new JSDOM(`<!doctype html><html><body><div id="app"><div id="parent" @click="parentClick"><button id="btn" @click.stop.prevent="btnClick">click</button></div></div></body></html>`, { runScripts: 'outside-only' })
+  global.window = domMod.window
+  global.document = domMod.window.document
+  global.HTMLElement = domMod.window.HTMLElement
+  let parentClicked = false
+  let btnClicked = false
+  const appMod = createAppDelim({
+    data() { return {} },
+    methods: {
+      parentClick() { parentClicked = true },
+      btnClick() { btnClicked = true }
+    }
+  })
+  await appMod.mount('#app')
+  const btnMod = domMod.window.document.getElementById('btn')
+  btnMod.dispatchEvent(new domMod.window.Event('click', { bubbles: true, cancelable: true }))
+  await new Promise(r => setTimeout(r, 0))
+  if (!btnClicked) fail('event modifiers: button handler did not run')
+  if (parentClicked) fail('event modifiers: @click.stop failed to stop propagation to parent')
+
+  // --- TEST v-if / v-else with comment in between ---
+  const domChain = new JSDOM(`<!doctype html><html><body><div id="app"><div v-if="ok">YES</div><!-- comment --><div v-else>NO</div></div></body></html>`, { runScripts: 'outside-only' })
+  global.window = domChain.window
+  global.document = domChain.window.document
+  global.HTMLElement = domChain.window.HTMLElement
+  const appChain = createAppDelim({
+    data() { return { ok: false } }
+  })
+  await appChain.mount('#app')
+  if (!domChain.window.document.getElementById('app').textContent.includes('NO')) {
+    fail('conditional comment skip: expected v-else "NO" to render despite comment node')
+  }
 
   console.log('All tests passed')
   process.exit(0)

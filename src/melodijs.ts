@@ -22,11 +22,14 @@ export interface MelodiOptions {
     methods?: Record<string, (this: any, ...args: any[]) => any>;
     computed?: Record<string, (this: any) => any>;
     watch?: Record<string, WatchCallback | WatchOptions>;
+    hooks?: Record<string, (this: any) => void>;
+    delimiters?: [string, string];
     template?: string | { el?: string; url?: string };
 }
 
 export interface ComponentDef {
     template?: string | { el?: string; url?: string };
+    delimiters?: [string, string];
     data?: () => Record<string, any>;
     methods?: Record<string, (this: any, ...args: any[]) => any>;
     props?: string[] | Record<string, PropDef>;
@@ -172,6 +175,8 @@ class MelodiJS {
                 computed: this.options.computed,
                 watch: this.options.watch,
                 template: this.options.template,
+                delimiters: this.options.delimiters,
+                hooks: this.options.hooks,
                 components: this.components  // Use this.components which includes plugin-registered components
             };
 
@@ -229,6 +234,7 @@ class MelodiJS {
 
 export class Component {
     template: string | { el?: string; url?: string };
+    delimiters?: [string, string] | null;
     dataFn: (this: any) => Record<string, any>;
     methodsDef: Record<string, (this: any, ...args: any[]) => any>;
     propsDef: string[] | Record<string, PropDef> | null;
@@ -253,6 +259,7 @@ export class Component {
 
     constructor(def: ComponentDef) {
         this.template = def.template || ''
+        this.delimiters = def.delimiters || null
         this.dataFn = def.data || function () { return {} }
         this.methodsDef = def.methods || {}
         // props can be an array of names or an object with detailed defs
@@ -275,6 +282,7 @@ export class Component {
     mount(el: Element, app: MelodiJS): Promise<boolean> {
         this.el = el
         this.app = app
+        this.delimiters = this.delimiters || (app && app.options && app.options.delimiters) || ['{{', '}}'];
         try { console.debug && console.debug('Component.mount start for', el && el.tagName) } catch (e) { }
 
         // capture the light DOM (children) to support <slot>
@@ -744,11 +752,16 @@ export class Component {
             const text = node.nodeValue || '';
             if (text.trim() === '') return node.cloneNode(true);
 
-            const parts = text.split(/(\{\{[^}]+\}\})/g);
+            const delims = this.delimiters || (this.app && this.app.options && this.app.options.delimiters) || ['{{', '}}'];
+            const open = delims[0].replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const close = delims[1].replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const splitRegex = new RegExp('(' + open + '[\\s\\S]+?' + close + ')', 'g');
+            const matchRegex = new RegExp('^' + open + '\\s*([\\s\\S]+?)\\s*' + close + '$');
+            const parts = text.split(splitRegex);
             if (parts.length > 1) {
                 const frag = document.createDocumentFragment();
                 parts.forEach(part => {
-                    const m = part.match(/^\{\{\s*([^}]+)\s*\}\}$/);
+                    const m = part.match(matchRegex);
                     if (m) {
                         const expr = m[1];
                         const textNode = document.createTextNode('');
@@ -838,11 +851,18 @@ export class Component {
 
                 // Events: @click, v-on:click
                 if (name.startsWith('@') || name.startsWith('v-on:')) {
-                    const eventName = name.startsWith('@') ? name.slice(1) : name.slice(5);
+                    const rawEventName = name.startsWith('@') ? name.slice(1) : name.slice(5);
+                    const parts = rawEventName.split('.');
+                    const eventName = parts[0];
+                    const isStop = parts.includes('stop');
+                    const isPrevent = parts.includes('prevent');
                     el.removeAttribute(name);
                     const handlerName = value.trim();
 
                     const handlerFn = (e: Event) => {
+                        if (isStop && e && typeof e.stopPropagation === 'function') e.stopPropagation();
+                        if (isPrevent && e && typeof e.preventDefault === 'function') e.preventDefault();
+
                         // Try to find method first (simple name like "increment")
                         if (this.methods[handlerName]) {
                             this.methods[handlerName](e);
@@ -852,7 +872,7 @@ export class Component {
                             const evalScope = Object.assign({}, scope, this.methods, { $event: e });
                             try {
                                 // Evaluate with both state and scope (which includes methods)
-                                const fn = new Function('state', 'scope', 'with(scope){ with(state){ return ' + handlerName + ' } }');
+                                const fn = new Function('state', 'scope', 'with(state){ with(scope){ return ' + handlerName + ' } }');
                                 fn(this.state, evalScope);
                             } catch (err) {
                                 console.error('Error evaluating handler:', handlerName, err);
@@ -924,8 +944,8 @@ export class Component {
         while (currentIndex < nodes.length) {
             const node = nodes[currentIndex];
 
-            // Skip text nodes (whitespace) between branches
-            if (node.nodeType === 3 && !node.nodeValue?.trim()) {
+            // Skip text nodes (whitespace) and comment nodes between branches
+            if (node.nodeType === 8 || (node.nodeType === 3 && !node.nodeValue?.trim())) {
                 currentIndex++;
                 continue;
             }

@@ -219,6 +219,49 @@ async function run(){
     fail('conditional comment skip: expected v-else "NO" to render despite comment node')
   }
 
+  // --- TEST Writable Computed (get/set object) ---
+  const domComputed = new JSDOM(`<!doctype html><html><body><div id="app">Val: {{ double }}</div></body></html>`, { runScripts: 'outside-only' })
+  global.window = domComputed.window
+  global.document = domComputed.window.document
+  global.HTMLElement = domComputed.window.HTMLElement
+  const { createApp: createAppComputed } = await import(modPath)
+  const appComputed = createAppComputed({
+    data() { return { count: 5 } },
+    computed: {
+      double: {
+        get() { return this.count * 2 },
+        set(val) { this.count = val / 2 }
+      }
+    }
+  })
+  await appComputed.mount('#app')
+  if (!domComputed.window.document.getElementById('app').textContent.includes('Val: 10')) {
+    fail('writable computed: expected "Val: 10", got: ' + domComputed.window.document.getElementById('app').textContent)
+  }
+  appComputed.state.double = 50
+  await new Promise(r => setTimeout(r, 0))
+  if (appComputed.state.count !== 25) {
+    fail('writable computed: expected count to be 25 after setter, got: ' + appComputed.state.count)
+  }
+
+  // --- TEST Top-level mounted() hook on components ---
+  let mountedCalled = false
+  const domMounted = new JSDOM(`<!doctype html><html><body><div id="app">Mounted test</div></body></html>`, { runScripts: 'outside-only' })
+  global.window = domMounted.window
+  global.document = domMounted.window.document
+  global.HTMLElement = domMounted.window.HTMLElement
+  const { createApp: createAppMounted } = await import(modPath)
+  const appMounted = createAppMounted({
+    data() { return { ok: true } },
+    mounted() {
+      mountedCalled = true
+    }
+  })
+  await appMounted.mount('#app')
+  if (!mountedCalled) {
+    fail('top-level mounted: expected mounted() hook to be called on component mount')
+  }
+
   console.log('All tests passed')
   process.exit(0)
 }

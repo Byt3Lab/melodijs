@@ -23,9 +23,23 @@ export interface MelodiOptions {
     computed?: Record<string, (this: any) => any>;
     watch?: Record<string, WatchCallback | WatchOptions>;
     hooks?: Record<string, (this: any) => void>;
+    beforeCreate?: (this: any) => void;
+    created?: (this: any) => void;
+    beforeMount?: (this: any) => void;
+    mounted?: (this: any) => void;
+    beforeUpdate?: (this: any) => void;
+    updated?: (this: any) => void;
+    beforeUnmount?: (this: any) => void;
+    unmounted?: (this: any) => void;
     delimiters?: [string, string];
     template?: string | { el?: string; url?: string };
 }
+
+export interface WritableComputedDef<T = any> {
+    get: (this: any) => T;
+    set?: (this: any, value: T) => void;
+}
+export type ComputedGetter<T = any> = (this: any) => T;
 
 export interface ComponentDef {
     template?: string | { el?: string; url?: string };
@@ -34,8 +48,16 @@ export interface ComponentDef {
     methods?: Record<string, (this: any, ...args: any[]) => any>;
     props?: string[] | Record<string, PropDef>;
     hooks?: Record<string, (this: any) => void>;
+    beforeCreate?: (this: any) => void;
+    created?: (this: any) => void;
+    beforeMount?: (this: any) => void;
+    mounted?: (this: any) => void;
+    beforeUpdate?: (this: any) => void;
+    updated?: (this: any) => void;
+    beforeUnmount?: (this: any) => void;
+    unmounted?: (this: any) => void;
     components?: Record<string, ComponentDef>;
-    computed?: Record<string, (this: any) => any>;
+    computed?: Record<string, ComputedGetter | WritableComputedDef>;
     watch?: Record<string, WatchCallback | WatchOptions>;
 }
 
@@ -125,6 +147,7 @@ export interface Plugin {
 class MelodiJS {
     options: MelodiOptions;
     root: Element | null;
+    rootComponent: Component | null = null;
     components: Record<string, ComponentDef>;
     _mountedComponents: Component[];
     reactivity: MelodiReactive;
@@ -134,6 +157,7 @@ class MelodiJS {
     constructor(options: MelodiOptions) {
         this.options = options || {}
         this.root = null
+        this.rootComponent = null
         this.components = this.options.components || {}
         this._mountedComponents = []
         this.reactivity = new MelodiReactive();
@@ -146,6 +170,10 @@ class MelodiJS {
             props: ['name'],
             template: '<div :data-melodi-transition="name"><slot></slot></div>'
         };
+    }
+
+    get state(): any {
+        return this.rootComponent ? this.rootComponent.state : null;
     }
 
     use(plugin: Plugin, options?: any): this {
@@ -177,10 +205,19 @@ class MelodiJS {
                 template: this.options.template,
                 delimiters: this.options.delimiters,
                 hooks: this.options.hooks,
+                beforeCreate: this.options.beforeCreate,
+                created: this.options.created,
+                beforeMount: this.options.beforeMount,
+                mounted: this.options.mounted,
+                beforeUpdate: this.options.beforeUpdate,
+                updated: this.options.updated,
+                beforeUnmount: this.options.beforeUnmount,
+                unmounted: this.options.unmounted,
                 components: this.components  // Use this.components which includes plugin-registered components
             };
 
             const rootComp = new Component(rootComponentDef);
+            this.rootComponent = rootComp;
             const p = rootComp.mount(this.root, this).then(() => {
                 (this.root as any).__melodijs_mounted = true;
                 (this.root as any).__melodijs_root = rootComp;
@@ -240,7 +277,7 @@ export class Component {
     propsDef: string[] | Record<string, PropDef> | null;
     hooks: Record<string, (this: any) => void>;
     components: Record<string, ComponentDef>;
-    computedDef: Record<string, (this: any) => any>;
+    computedDef: Record<string, ComputedGetter | WritableComputedDef>;
     watchDef: Record<string, WatchCallback | WatchOptions>;
 
     el: Element | null;
@@ -264,8 +301,19 @@ export class Component {
         this.methodsDef = def.methods || {}
         // props can be an array of names or an object with detailed defs
         this.propsDef = def.props || null
-        // lifecycle hooks: prefer explicit hooks, fallback to methods (migrated below)
-        this.hooks = def.hooks || {}
+        // lifecycle hooks: prefer explicit hooks, fallback to top-level lifecycle methods
+        this.hooks = { ...(def.hooks || {}) };
+        const standardHooks = [
+            'beforeCreate', 'created',
+            'beforeMount', 'mounted',
+            'beforeUpdate', 'updated',
+            'beforeUnmount', 'unmounted'
+        ];
+        for (const hookName of standardHooks) {
+            if (typeof (def as any)[hookName] === 'function' && !this.hooks[hookName]) {
+                this.hooks[hookName] = (def as any)[hookName];
+            }
+        }
         this.components = def.components || {}
         this.computedDef = def.computed || {}
         this.watchDef = def.watch || {}
@@ -324,7 +372,10 @@ export class Component {
 
         // create reactive state
         this.reactivity = app.reactivity;
-        this.state = this._makeReactive(initial)
+        this.state = this._makeReactive(initial);
+
+        // created hook
+        try { if (typeof this.hooks.created === 'function') this.hooks.created.call(this.state); } catch (e) { console.error('Error in created hook:', e); }
 
         // inject references into state for convenience (element, app, root)
         try { this.state.__lastEl = this.el; this.state.__slotSourceEl = this.el; this.state.$app = app; this.state.$root = document } catch (e) { }
@@ -552,13 +603,26 @@ export class Component {
         // Initialize computed properties
         if (this.computedDef) {
             Object.keys(this.computedDef).forEach(key => {
-                const fn = this.computedDef[key].bind(state);
-                const memo = this.reactivity!.createMemo(fn);
-                Object.defineProperty(state, key, {
-                    get: memo,
-                    enumerable: true,
-                    configurable: true
-                });
+                const def: any = this.computedDef[key];
+                if (typeof def === 'function') {
+                    const fn = def.bind(state);
+                    const memo = this.reactivity!.createMemo(fn);
+                    Object.defineProperty(state, key, {
+                        get: memo,
+                        enumerable: true,
+                        configurable: true
+                    });
+                } else if (def && typeof def === 'object') {
+                    const getFn = typeof def.get === 'function' ? def.get.bind(state) : () => undefined;
+                    const memo = this.reactivity!.createMemo(getFn);
+                    const setFn = typeof def.set === 'function' ? def.set.bind(state) : undefined;
+                    Object.defineProperty(state, key, {
+                        get: memo,
+                        set: setFn,
+                        enumerable: true,
+                        configurable: true
+                    });
+                }
             });
         }
 
@@ -1345,8 +1409,9 @@ export class Component {
     }
 
     unmount(): void {
-        // call unmounted hook
-        try { if (typeof this.hooks.unmounted === 'function') this.hooks.unmounted.call(this.state) } catch (e) { }
+        // call beforeUnmount and unmounted hooks
+        try { if (typeof this.hooks.beforeUnmount === 'function') this.hooks.beforeUnmount.call(this.state); } catch (e) { }
+        try { if (typeof this.hooks.unmounted === 'function') this.hooks.unmounted.call(this.state); } catch (e) { }
 
         // remove event listeners
         this._listeners.forEach(l => {

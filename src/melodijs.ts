@@ -142,6 +142,46 @@ export interface Plugin {
     install: (app: MelodiJS, options?: any) => void;
 }
 
+// Global nextTick helper
+export function nextTick(fn?: () => void): Promise<void> {
+    const p = Promise.resolve();
+    return fn ? p.then(fn) : p;
+}
+
+// Helper functions for class and style normalization
+function normalizeClass(val: any): string {
+    if (typeof val === 'string') return val.trim();
+    if (Array.isArray(val)) {
+        return val.map(normalizeClass).filter(Boolean).join(' ');
+    }
+    if (val && typeof val === 'object') {
+        return Object.keys(val).filter(key => Boolean(val[key])).join(' ');
+    }
+    return '';
+}
+
+function normalizeStyle(val: any): Record<string, string> {
+    const res: Record<string, string> = {};
+    if (typeof val === 'string') {
+        val.split(';').forEach(item => {
+            const idx = item.indexOf(':');
+            if (idx !== -1) {
+                const k = item.slice(0, idx).trim();
+                const v = item.slice(idx + 1).trim();
+                if (k && v) res[k] = v;
+            }
+        });
+    } else if (Array.isArray(val)) {
+        val.forEach(item => Object.assign(res, normalizeStyle(item)));
+    } else if (val && typeof val === 'object') {
+        Object.keys(val).forEach(key => {
+            const cssKey = key.replace(/([A-Z])/g, '-$1').toLowerCase();
+            res[cssKey] = val[key] == null ? '' : String(val[key]);
+        });
+    }
+    return res;
+}
+
 // Minimal reactive component library (tiny Vue-like)
 
 class MelodiJS {
@@ -284,6 +324,7 @@ export class Component {
     app: MelodiJS | null;
     state: any;
     methods: Record<string, Function>;
+    $refs: Record<string, any>;
     _listeners: { node: Element; ev: string; fn: EventListener }[];
     _effects: CleanupFn[]; // Track effects for cleanup
     _events: Record<string, Function[]>;
@@ -322,6 +363,7 @@ export class Component {
         this.app = null
         this.state = null
         this.methods = {}
+        this.$refs = {}
         this._listeners = []
         this._effects = [] // Track effects for cleanup
         this._events = {}
@@ -378,7 +420,15 @@ export class Component {
         try { if (typeof this.hooks.created === 'function') this.hooks.created.call(this.state); } catch (e) { console.error('Error in created hook:', e); }
 
         // inject references into state for convenience (element, app, root)
-        try { this.state.__lastEl = this.el; this.state.__slotSourceEl = this.el; this.state.$app = app; this.state.$root = document } catch (e) { }
+        try {
+            this.state.__lastEl = this.el;
+            this.state.__slotSourceEl = this.el;
+            this.state.$app = app;
+            this.state.$root = document;
+            this.state.$el = this.el;
+            this.state.$refs = this.$refs;
+            this.state.$nextTick = nextTick;
+        } catch (e) { }
 
         // event API helpers available on state
         try {
@@ -564,7 +614,32 @@ export class Component {
         return val
     }
 
-    // Fine-grain reactivity: wrap each property in a signal
+    _getNestedValue(path: string): any {
+        if (!path) return undefined;
+        const parts = path.split('.');
+        let cur = this.state;
+        for (const part of parts) {
+            if (cur == null) return undefined;
+            cur = cur[part];
+        }
+        return cur;
+    }
+
+    _setNestedValue(path: string, val: any): void {
+        if (!path) return;
+        const parts = path.split('.');
+        let cur = this.state;
+        for (let i = 0; i < parts.length - 1; i++) {
+            const part = parts[i];
+            if (cur[part] == null || typeof cur[part] !== 'object') {
+                cur[part] = {};
+            }
+            cur = cur[part];
+        }
+        cur[parts[parts.length - 1]] = val;
+    }
+
+    // Fine-grain reactivity: wrap each property in a signal with deep reactivity
     _makeReactive(obj: any): any {
         const state: any = {};
         this._signals = {};
@@ -573,15 +648,22 @@ export class Component {
             const initialValue = obj[key];
             const [getter, setter] = this.reactivity.createSignal(initialValue);
 
-            // Wrap arrays in a Proxy to intercept mutations
-            if (Array.isArray(initialValue)) {
-                const proxyArray = this._makeReactiveArray(initialValue, setter);
-                setter(proxyArray);
+            if (initialValue !== null && typeof initialValue === 'object') {
+                let currentProxy: any;
+                const notify = () => {
+                    setter(currentProxy);
+                };
+                currentProxy = this._makeDeepReactive(initialValue, notify);
+                setter(currentProxy);
                 Object.defineProperty(state, key, {
                     get: getter,
                     set: (newVal) => {
-                        if (Array.isArray(newVal)) {
-                            setter(this._makeReactiveArray(newVal, setter));
+                        if (newVal !== null && typeof newVal === 'object') {
+                            const newNotify = () => {
+                                setter(currentProxy);
+                            };
+                            currentProxy = this._makeDeepReactive(newVal, newNotify);
+                            setter(currentProxy);
                         } else {
                             setter(newVal);
                         }
@@ -592,7 +674,18 @@ export class Component {
             } else {
                 Object.defineProperty(state, key, {
                     get: getter,
-                    set: setter,
+                    set: (newVal) => {
+                        if (newVal !== null && typeof newVal === 'object') {
+                            let currentProxy: any;
+                            const notify = () => {
+                                setter(currentProxy);
+                            };
+                            currentProxy = this._makeDeepReactive(newVal, notify);
+                            setter(currentProxy);
+                        } else {
+                            setter(newVal);
+                        }
+                    },
                     enumerable: true,
                     configurable: true
                 });
@@ -629,34 +722,42 @@ export class Component {
         return state;
     }
 
-    _makeReactiveArray(arr: any[], setter: SignalWrite<any>): any[] {
+    _makeDeepReactive(val: any, notify: () => void): any {
+        if (val === null || typeof val !== 'object') return val;
+
         const mutatingMethods = ['push', 'pop', 'shift', 'unshift', 'splice', 'sort', 'reverse'];
+        const self = this;
 
-        const proxy = new Proxy(arr, {
-            get(target, prop) {
-                const value = (target as any)[prop];
-
-                // Intercept mutating methods
-                if (typeof prop === 'string' && mutatingMethods.includes(prop)) {
+        const proxy: any = new Proxy(val, {
+            get(target, prop, receiver) {
+                if (Array.isArray(target) && typeof prop === 'string' && mutatingMethods.includes(prop)) {
                     return function (...args: any[]) {
                         const result = (Array.prototype as any)[prop].apply(target, args);
-                        // Trigger reactivity - setter will always trigger for objects
-                        setter(proxy);
+                        notify();
                         return result;
                     };
                 }
-
-                return value;
+                const res = Reflect.get(target, prop, receiver);
+                if (res !== null && typeof res === 'object') {
+                    return self._makeDeepReactive(res, notify);
+                }
+                return res;
             },
-            set(target, prop, value) {
-                (target as any)[prop] = value;
-                // Trigger reactivity on index assignment
-                setter(proxy);
-                return true;
+            set(target, prop, value, receiver) {
+                const oldVal = Reflect.get(target, prop, receiver);
+                const result = Reflect.set(target, prop, value, receiver);
+                if (oldVal !== value || Array.isArray(target)) {
+                    notify();
+                }
+                return result;
             }
         });
 
         return proxy;
+    }
+
+    _makeReactiveArray(arr: any[], setter: SignalWrite<any>): any[] {
+        return this._makeDeepReactive(arr, () => setter(arr));
     }
 
     _evalExpression(expr: string, scope: any): any {
@@ -866,6 +967,12 @@ export class Component {
             // Clone element
             const el = elNode.cloneNode(false) as HTMLElement;
 
+            // Register ref if present
+            if (elNode.hasAttribute('ref')) {
+                const refKey = elNode.getAttribute('ref')!;
+                this.$refs[refKey] = el;
+            }
+
             // Handle v-show
             if (el.hasAttribute('v-show')) {
                 const expr = el.getAttribute('v-show')!;
@@ -876,19 +983,53 @@ export class Component {
                 });
             }
 
-            // Handle v-model
-            if (el.hasAttribute('v-model')) {
-                const prop = el.getAttribute('v-model')!.trim();
-                el.removeAttribute('v-model');
+            // Handle v-html
+            if (el.hasAttribute('v-html')) {
+                const expr = el.getAttribute('v-html')!;
+                el.removeAttribute('v-html');
+                this._createEffect(() => {
+                    const val = this._evalExpression(expr, scope);
+                    el.innerHTML = (val == null) ? '' : String(val);
+                });
+            }
+
+            // Handle v-text
+            if (el.hasAttribute('v-text')) {
+                const expr = el.getAttribute('v-text')!;
+                el.removeAttribute('v-text');
+                this._createEffect(() => {
+                    const val = this._evalExpression(expr, scope);
+                    el.textContent = (val == null) ? '' : String(val);
+                });
+            }
+
+            // Handle v-model (with modifiers .trim, .number, .lazy and nested paths)
+            const vModelAttr = Array.from(el.attributes).find(a => a.name === 'v-model' || a.name.startsWith('v-model.'));
+            if (vModelAttr) {
+                const rawName = vModelAttr.name;
+                const modifiers = rawName.split('.').slice(1);
+                const isLazy = modifiers.includes('lazy');
+                const isNumber = modifiers.includes('number');
+                const isTrim = modifiers.includes('trim');
+                const propPath = vModelAttr.value.trim();
+                el.removeAttribute(rawName);
 
                 if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT') {
                     const inputEl = el as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement;
-                    // Two-way binding
+                    const isCheckbox = inputEl.tagName === 'INPUT' && (inputEl as HTMLInputElement).type === 'checkbox';
+                    const isRadio = inputEl.tagName === 'INPUT' && (inputEl as HTMLInputElement).type === 'radio';
+
                     // 1. Model -> View
                     this._createEffect(() => {
-                        const val = this.state[prop];
-                        if (inputEl.type === 'checkbox') {
-                            (inputEl as HTMLInputElement).checked = !!val;
+                        const val = this._getNestedValue(propPath);
+                        if (isCheckbox) {
+                            if (Array.isArray(val)) {
+                                (inputEl as HTMLInputElement).checked = val.includes(inputEl.value);
+                            } else {
+                                (inputEl as HTMLInputElement).checked = !!val;
+                            }
+                        } else if (isRadio) {
+                            (inputEl as HTMLInputElement).checked = (val == inputEl.value);
                         } else {
                             inputEl.value = (val == null) ? '' : val;
                         }
@@ -896,15 +1037,42 @@ export class Component {
 
                     // 2. View -> Model
                     const handler = (e: Event) => {
-                        const val = (inputEl.type === 'checkbox') ? (inputEl as HTMLInputElement).checked : inputEl.value;
-                        this.state[prop] = val;
+                        if (isCheckbox) {
+                            const current = this._getNestedValue(propPath);
+                            if (Array.isArray(current)) {
+                                const arr = [...current];
+                                const itemVal = inputEl.value;
+                                if ((inputEl as HTMLInputElement).checked) {
+                                    if (!arr.includes(itemVal)) arr.push(itemVal);
+                                } else {
+                                    const idx = arr.indexOf(itemVal);
+                                    if (idx !== -1) arr.splice(idx, 1);
+                                }
+                                this._setNestedValue(propPath, arr);
+                            } else {
+                                this._setNestedValue(propPath, (inputEl as HTMLInputElement).checked);
+                            }
+                        } else if (isRadio) {
+                            if ((inputEl as HTMLInputElement).checked) {
+                                this._setNestedValue(propPath, inputEl.value);
+                            }
+                        } else {
+                            let val: any = inputEl.value;
+                            if (isTrim && typeof val === 'string') val = val.trim();
+                            if (isNumber) {
+                                const num = parseFloat(val);
+                                if (!isNaN(num)) val = num;
+                            }
+                            this._setNestedValue(propPath, val);
+                        }
                     };
-                    el.addEventListener('input', handler);
-                    // Also listen to change for some inputs
-                    if (el.tagName === 'SELECT' || (inputEl as HTMLInputElement).type === 'checkbox' || (inputEl as HTMLInputElement).type === 'radio') {
+
+                    const eventType = isLazy ? 'change' : 'input';
+                    el.addEventListener(eventType, handler);
+                    if (el.tagName === 'SELECT' || isCheckbox || isRadio) {
                         el.addEventListener('change', handler);
                     }
-                    this._listeners.push({ node: el, ev: 'input', fn: handler });
+                    this._listeners.push({ node: el, ev: eventType, fn: handler });
                 }
             }
 
@@ -920,22 +1088,53 @@ export class Component {
                     const eventName = parts[0];
                     const isStop = parts.includes('stop');
                     const isPrevent = parts.includes('prevent');
+                    const isOnce = parts.includes('once');
+                    const isSelf = parts.includes('self');
+                    const isCapture = parts.includes('capture');
+
+                    const keyAliases: Record<string, string> = {
+                        enter: 'Enter',
+                        tab: 'Tab',
+                        delete: 'Delete',
+                        esc: 'Escape',
+                        escape: 'Escape',
+                        space: ' ',
+                        up: 'ArrowUp',
+                        down: 'ArrowDown',
+                        left: 'ArrowLeft',
+                        right: 'ArrowRight'
+                    };
+                    const specialMods = ['stop', 'prevent', 'once', 'self', 'capture'];
+                    const keyModifiers = parts.slice(1).filter(p => !specialMods.includes(p));
+
                     el.removeAttribute(name);
                     const handlerName = value.trim();
 
                     const handlerFn = (e: Event) => {
+                        if (isSelf && e.target !== el) return;
                         if (isStop && e && typeof e.stopPropagation === 'function') e.stopPropagation();
                         if (isPrevent && e && typeof e.preventDefault === 'function') e.preventDefault();
+
+                        if (keyModifiers.length > 0 && e instanceof (window.KeyboardEvent || Event)) {
+                            const kb = e as KeyboardEvent;
+                            const matches = keyModifiers.some(mod => {
+                                const exp = keyAliases[mod.toLowerCase()] || mod;
+                                return kb.key && kb.key.toLowerCase() === exp.toLowerCase();
+                            });
+                            if (!matches) return;
+                        }
+
+                        if (isOnce) {
+                            el.removeEventListener(eventName, handlerFn, isCapture ? { capture: true } : false);
+                        }
 
                         // Try to find method first (simple name like "increment")
                         if (this.methods[handlerName]) {
                             this.methods[handlerName](e);
                         } else {
                             // Try eval with $event and methods
-                            // Add methods to scope so they're accessible in expressions
                             const evalScope = Object.assign({}, scope, this.methods, { $event: e });
                             try {
-                                // Evaluate with both state and scope (which includes methods)
                                 const fn = new Function('state', 'scope', 'with(state){ with(scope){ return ' + handlerName + ' } }');
                                 fn(this.state, evalScope);
                             } catch (err) {
@@ -945,7 +1144,7 @@ export class Component {
                         }
                     };
 
-                    el.addEventListener(eventName, handlerFn);
+                    el.addEventListener(eventName, handlerFn, isCapture ? { capture: true } : false);
                     this._listeners.push({ node: el, ev: eventName, fn: handlerFn });
                     return;
                 }
@@ -953,22 +1152,37 @@ export class Component {
                 // Bindings: :attr, v-bind:attr
                 if (name.startsWith(':') || name.startsWith('v-bind:')) {
                     const attrName = name.startsWith(':') ? name.slice(1) : name.slice(7);
+                    const staticClass = el.getAttribute('class') || '';
                     el.removeAttribute(name);
                     this._createEffect(() => {
                         const val = this._evalExpression(value, scope);
                         if (attrName === 'class') {
-                            if (typeof val === 'object' && val !== null) {
-                                Object.keys(val).forEach(cls => {
-                                    if (val[cls]) el.classList.add(cls);
-                                    else el.classList.remove(cls);
+                            const dyn = normalizeClass(val);
+                            const combined = [staticClass, dyn].filter(Boolean).join(' ');
+                            if (combined) el.setAttribute('class', combined);
+                            else el.removeAttribute('class');
+                        } else if (attrName === 'style') {
+                            if (typeof val === 'string') {
+                                el.style.cssText = val;
+                            } else if (val && typeof val === 'object') {
+                                const styles = normalizeStyle(val);
+                                Object.keys(styles).forEach(prop => {
+                                    (el.style as any)[prop] = styles[prop];
                                 });
                             } else {
-                                el.setAttribute('class', val);
+                                el.removeAttribute('style');
                             }
-                        } else if (val === false || val === null || val === undefined) {
-                            el.removeAttribute(attrName);
                         } else {
-                            el.setAttribute(attrName, val);
+                            const booleanProps = ['disabled', 'checked', 'selected', 'readonly'];
+                            if (booleanProps.includes(attrName) && attrName in el) {
+                                (el as any)[attrName] = Boolean(val);
+                                if (val) el.setAttribute(attrName, '');
+                                else el.removeAttribute(attrName);
+                            } else if (val === false || val === null || val === undefined) {
+                                el.removeAttribute(attrName);
+                            } else {
+                                el.setAttribute(attrName, val);
+                            }
                         }
                     });
                 }
@@ -1474,6 +1688,10 @@ export class Component {
                 const comp = new Component(compDef)
                 // set logical parent so events can bubble even if DOM structure differs
                 try { comp._parent = this } catch (e) { }
+                const compRef = node.getAttribute('ref');
+                if (compRef) {
+                    this.$refs[compRef] = comp;
+                }
                 try {
                     await comp.mount(node, this.app);
                     (node as any).__melodijs_mounted = true
@@ -1504,6 +1722,10 @@ export class Component {
                     const compDef = allComponents[tag];
                     const comp = new Component(compDef);
                     try { comp._parent = this; } catch (e) { }
+                    const nodeRef = node.getAttribute('ref');
+                    if (nodeRef) {
+                        this.$refs[nodeRef] = comp;
+                    }
                     try {
                         await comp.mount(node, this.app);
                         (node as any).__melodijs_mounted = true;
@@ -1537,6 +1759,10 @@ export class Component {
                 const compDef = allComponents[tag];
                 const comp = new Component(compDef);
                 try { comp._parent = this; } catch (e) { }
+                const childRef = childNode.getAttribute('ref');
+                if (childRef) {
+                    this.$refs[childRef] = comp;
+                }
                 try {
                     await comp.mount(childNode, this.app);
                     (childNode as any).__melodijs_mounted = true;

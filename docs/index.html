@@ -359,6 +359,7 @@
         <a href="#props" class="sidebar-link">Props</a>
         <a href="#events-component" class="sidebar-link">Events</a>
         <a href="#slots" class="sidebar-link">Slots</a>
+        <a href="#refs-nexttick" class="sidebar-link">Refs & nextTick</a>
         <a href="#lifecycle" class="sidebar-link">Lifecycle</a>
       </div>
       <div class="sidebar-group">
@@ -460,6 +461,13 @@ app.mount('#app');</code></pre>
         <h3>Text Interpolation</h3>
         <pre><code>&lt;span&gt;Message: {{ msg }}&lt;/span&gt;</code></pre>
 
+        <h3>Raw HTML (v-html) & Plain Text (v-text)</h3>
+        <pre><code>&lt;!-- Renders unescaped HTML --&gt;
+&lt;div v-html="rawHtmlString"&gt;&lt;/div&gt;
+
+&lt;!-- Sets textContent directly --&gt;
+&lt;span v-text="plainText"&gt;&lt;/span&gt;</code></pre>
+
         <h3>Attribute Binding</h3>
         <pre><code>&lt;div v-bind:id="dynamicId"&gt;&lt;/div&gt;
 &lt;!-- Shorthand --&gt;
@@ -557,9 +565,15 @@ this.items[0] = 99;       // ✅ Reactive</code></pre>
         <h2>Class & Style Bindings</h2>
 
         <h3>Dynamic Classes</h3>
-        <pre><code>&lt;div :class="{ active: isActive, 'text-danger': hasError }"&gt;&lt;/div&gt;</code></pre>
+        <p>Supports strings, objects, and arrays (including array of objects):</p>
+        <pre><code>&lt;!-- Object syntax --&gt;
+&lt;div :class="{ active: isActive, 'text-danger': hasError }"&gt;&lt;/div&gt;
+
+&lt;!-- Array syntax with conditions --&gt;
+&lt;div :class="[baseClass, { active: isActive }]"&gt;&lt;/div&gt;</code></pre>
 
         <h3>Dynamic Styles</h3>
+        <p>Supports style objects with camelCase or kebab-case keys, as well as raw strings:</p>
         <pre><code>&lt;div :style="{ color: textColor, fontSize: fontSize + 'px' }"&gt;&lt;/div&gt;</code></pre>
       </section>
 
@@ -600,17 +614,46 @@ this.items[0] = 99;       // ✅ Reactive</code></pre>
 
         <h3>Event with Parameters</h3>
         <pre><code>&lt;button @click="say('Hello')"&gt;Say Hello&lt;/button&gt;</code></pre>
+
+        <h3>Event & Key Modifiers</h3>
+        <pre><code>&lt;!-- Stop propagation & prevent default --&gt;
+&lt;button @click.stop.prevent="handleClick"&gt;Submit&lt;/button&gt;
+
+&lt;!-- Trigger only once --&gt;
+&lt;button @click.once="init"&gt;Initialize&lt;/button&gt;
+
+&lt;!-- Keyboard modifiers: enter, esc, tab, space, arrow keys --&gt;
+&lt;input @keyup.enter="submitForm" /&gt;
+&lt;input @keydown.esc="closeModal" /&gt;</code></pre>
       </section>
 
       <section id="forms">
         <h2>Form Input Bindings</h2>
-        <p>Use <code>v-model</code> for two-way data binding:</p>
+        <p>Use <code>v-model</code> for two-way data binding with deep reactivity and modifiers:</p>
 
-        <h3>Text Input</h3>
-        <pre><code>&lt;input v-model="message" /&gt;</code></pre>
+        <h3>Text Input & Modifiers</h3>
+        <pre><code>&lt;!-- Standard binding --&gt;
+&lt;input v-model="message" /&gt;
 
-        <h3>Checkbox</h3>
-        <pre><code>&lt;input type="checkbox" v-model="checked" /&gt;</code></pre>
+&lt;!-- Deep nested property --&gt;
+&lt;input v-model="user.profile.name" /&gt;
+
+&lt;!-- Modifiers: .trim, .number, .lazy --&gt;
+&lt;input v-model.trim="username" /&gt;
+&lt;input v-model.number="age" type="number" /&gt;
+&lt;input v-model.lazy="searchQuery" /&gt;</code></pre>
+
+        <h3>Checkbox & Radio</h3>
+        <pre><code>&lt;!-- Boolean toggle --&gt;
+&lt;input type="checkbox" v-model="checked" /&gt;
+
+&lt;!-- Multiple checkboxes bound to an array --&gt;
+&lt;input type="checkbox" value="Apple" v-model="fruits" /&gt;
+&lt;input type="checkbox" value="Banana" v-model="fruits" /&gt;
+
+&lt;!-- Radio group --&gt;
+&lt;input type="radio" value="male" v-model="gender" /&gt;
+&lt;input type="radio" value="female" v-model="gender" /&gt;</code></pre>
 
         <h3>Select</h3>
         <pre><code>&lt;select v-model="selected"&gt;
@@ -668,6 +711,23 @@ methods: {
 
 // Usage
 &lt;my-button&gt;Click Me&lt;/my-button&gt;</code></pre>
+      </section>
+
+      <section id="refs-nexttick">
+        <h2>Template Refs & nextTick</h2>
+        <p>Directly reference DOM elements or child components, and wait for DOM updates:</p>
+        <pre><code>// In your template
+&lt;input ref="myInput" /&gt;
+&lt;button @click="updateAndFocus"&gt;Update&lt;/button&gt;
+
+// In methods
+methods: {
+  async updateAndFocus() {
+    this.message = 'Hello!';
+    await this.$nextTick(); // Wait for DOM updates
+    this.$refs.myInput.focus();
+  }
+}</code></pre>
       </section>
 
       <section id="lifecycle">

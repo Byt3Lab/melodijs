@@ -96,9 +96,12 @@ this.items[0] = 99;           // ✅ Reactive
 MelodiJS supports Vue-like template syntax:
 
 - **Interpolation**: `{{ expression }}`
-- **Attribute binding**: `:attr="value"` or `v-bind:attr="value"`
-- **Event handling**: `@click="handler"` or `v-on:click="handler"`
-- **Directives**: `v-if`, `v-else-if`, `v-else`, `v-show`, `v-for`, `v-model`, `v-pre`
+- **Directives**: `v-if`, `v-else-if`, `v-else`, `v-show`, `v-for`, `v-model`, `v-html`, `v-text`, `v-pre`
+- **Attribute & Style binding**: `:attr="value"`, `:class="[baseClass, { active: isActive }]"` or `:style="{ color: textColor, fontSize: '14px' }"`
+- **Event handling**: `@click="handler"`, `@click.stop.prevent="handler"`, `@click.once="handler"`, or `@keyup.enter="submit"`
+- **Form binding**: `v-model="user.name"` with deep paths and modifiers (`.trim`, `.number`, `.lazy`)
+- **Template refs**: `ref="myInput"` accessible via `this.$refs.myInput`
+- **Next tick**: `await this.$nextTick()` or `import { nextTick } from 'melodijs'`
 
 ### Components
 
@@ -113,6 +116,29 @@ createApp({
           this.$emit('clicked', { time: Date.now() });
         }
       }
+    }
+  }
+}).mount('#app');
+```
+
+### Refs & nextTick
+
+Access DOM nodes or child components directly using `ref` and defer callbacks until DOM updates settle:
+
+```javascript
+createApp({
+  template: `
+    <div>
+      <input ref="inputRef" v-model="name" />
+      <button @click="focusInput">Focus</button>
+    </div>
+  `,
+  data: () => ({ name: 'Melodi' }),
+  methods: {
+    async focusInput() {
+      this.name = 'Updated';
+      await this.$nextTick();
+      this.$refs.inputRef.focus();
     }
   }
 }).mount('#app');

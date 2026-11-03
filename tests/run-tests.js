@@ -262,6 +262,168 @@ async function run(){
     fail('top-level mounted: expected mounted() hook to be called on component mount')
   }
 
+  // --- TEST v-html & v-text ---
+  const domHtmlText = new JSDOM(`<!doctype html><html><body><div id="app"><div id="html-target" v-html="rawHtml"></div><div id="text-target" v-text="rawText"></div></div></body></html>`, { runScripts: 'outside-only' })
+  global.window = domHtmlText.window
+  global.document = domHtmlText.window.document
+  global.HTMLElement = domHtmlText.window.HTMLElement
+  const appHtmlText = createAppDelim({
+    data() {
+      return {
+        rawHtml: '<strong id="bold-el">Hello <em>HTML</em></strong>',
+        rawText: 'Simple & Plain Text'
+      }
+    }
+  })
+  await appHtmlText.mount('#app')
+  const boldEl = domHtmlText.window.document.getElementById('bold-el')
+  const textTarget = domHtmlText.window.document.getElementById('text-target')
+  if (!boldEl || boldEl.textContent !== 'Hello HTML') {
+    fail('v-html: HTML content not rendered properly')
+  }
+  if (!textTarget || textTarget.textContent !== 'Simple & Plain Text') {
+    fail('v-text: text content not rendered properly')
+  }
+  // Reactive update
+  appHtmlText.state.rawHtml = '<span>Updated HTML</span>'
+  appHtmlText.state.rawText = 'Updated Text'
+  await new Promise(r => setTimeout(r, 0))
+  if (!domHtmlText.window.document.getElementById('html-target').innerHTML.includes('Updated HTML')) {
+    fail('v-html: reactive update failed')
+  }
+  if (textTarget.textContent !== 'Updated Text') {
+    fail('v-text: reactive update failed')
+  }
+
+  // --- TEST :class (array & object) & :style (object) ---
+  const domClassStyle = new JSDOM(`<!doctype html><html><body><div id="app"><div id="styled-box" class="base-class" :class="[activeClass, { 'is-active': isActive, 'is-hidden': !isActive }]" :style="{ color: textColor, fontSize: '18px' }"></div></div></body></html>`, { runScripts: 'outside-only' })
+  global.window = domClassStyle.window
+  global.document = domClassStyle.window.document
+  global.HTMLElement = domClassStyle.window.HTMLElement
+  const appClassStyle = createAppDelim({
+    data() {
+      return {
+        activeClass: 'pill',
+        isActive: true,
+        textColor: 'red'
+      }
+    }
+  })
+  await appClassStyle.mount('#app')
+  const styledBox = domClassStyle.window.document.getElementById('styled-box')
+  if (!styledBox) fail(':class/:style target missing')
+  if (!styledBox.classList.contains('base-class') || !styledBox.classList.contains('pill') || !styledBox.classList.contains('is-active')) {
+    fail(`:class array/object combination failed, got class: "${styledBox.getAttribute('class')}"`)
+  }
+  if (styledBox.classList.contains('is-hidden')) {
+    fail(':class object condition false should not be present')
+  }
+  if (styledBox.style.color !== 'red' || styledBox.style.fontSize !== '18px') {
+    fail(`:style object failed, got color: ${styledBox.style.color}, fontSize: ${styledBox.style.fontSize}`)
+  }
+  // Reactive update
+  appClassStyle.state.isActive = false
+  appClassStyle.state.textColor = 'blue'
+  await new Promise(r => setTimeout(r, 0))
+  if (styledBox.classList.contains('is-active') || !styledBox.classList.contains('is-hidden')) {
+    fail(':class reactive update failed')
+  }
+  if (styledBox.style.color !== 'blue') {
+    fail(':style reactive update failed')
+  }
+
+  // --- TEST Deep Reactivity & Nested v-model ---
+  const domDeep = new JSDOM(`<!doctype html><html><body><div id="app"><input id="user-input" v-model="user.profile.name" /><span id="user-display">{{ user.profile.name }}</span><input id="num-input" v-model.number="price" /></div></body></html>`, { runScripts: 'outside-only' })
+  global.window = domDeep.window
+  global.document = domDeep.window.document
+  global.HTMLElement = domDeep.window.HTMLElement
+  const appDeep = createAppDelim({
+    data() {
+      return {
+        user: {
+          profile: {
+            name: 'Alice'
+          }
+        },
+        price: 42
+      }
+    }
+  })
+  await appDeep.mount('#app')
+  const userInput = domDeep.window.document.getElementById('user-input')
+  const userDisplay = domDeep.window.document.getElementById('user-display')
+  const numInput = domDeep.window.document.getElementById('num-input')
+  if (userInput.value !== 'Alice' || userDisplay.textContent !== 'Alice') {
+    fail('nested v-model initial value failed')
+  }
+  // Change via deep assignment
+  appDeep.state.user.profile.name = 'Bob'
+  await new Promise(r => setTimeout(r, 0))
+  if (userDisplay.textContent !== 'Bob' || userInput.value !== 'Bob') {
+    fail('deep reactivity assignment failed')
+  }
+  // Change via DOM input
+  userInput.value = 'Charlie'
+  userInput.dispatchEvent(new domDeep.window.Event('input'))
+  await new Promise(r => setTimeout(r, 0))
+  if (appDeep.state.user.profile.name !== 'Charlie') {
+    fail('nested v-model DOM-to-state update failed')
+  }
+  // Number modifier
+  numInput.value = '99.5'
+  numInput.dispatchEvent(new domDeep.window.Event('input'))
+  await new Promise(r => setTimeout(r, 0))
+  if (appDeep.state.price !== 99.5 || typeof appDeep.state.price !== 'number') {
+    fail('v-model.number modifier failed to coerce to number')
+  }
+
+  // --- TEST Keyboard modifiers & $refs & nextTick ---
+  const domKeyRefs = new JSDOM(`<!doctype html><html><body><div id="app"><input ref="textInput" @keyup.enter="handleEnter" /><button ref="btnOnce" @click.once="handleOnce">Click Once</button></div></body></html>`, { runScripts: 'outside-only' })
+  global.window = domKeyRefs.window
+  global.document = domKeyRefs.window.document
+  global.HTMLElement = domKeyRefs.window.HTMLElement
+  let enterPressed = false
+  let onceCount = 0
+  const appKeyRefs = createAppDelim({
+    data() { return {} },
+    methods: {
+      handleEnter() { enterPressed = true },
+      handleOnce() { onceCount++ }
+    }
+  })
+  await appKeyRefs.mount('#app')
+  // Test $refs
+  if (!appKeyRefs.state.$refs || !appKeyRefs.state.$refs.textInput) {
+    fail('$refs: textInput ref missing')
+  }
+  if (!appKeyRefs.state.$refs.btnOnce) {
+    fail('$refs: btnOnce ref missing')
+  }
+  // Test keyboard event modifier
+  const textInputEl = appKeyRefs.state.$refs.textInput
+  textInputEl.dispatchEvent(new domKeyRefs.window.KeyboardEvent('keyup', { key: 'a' }))
+  await new Promise(r => setTimeout(r, 0))
+  if (enterPressed) fail('@keyup.enter triggered on wrong key "a"')
+  textInputEl.dispatchEvent(new domKeyRefs.window.KeyboardEvent('keyup', { key: 'Enter' }))
+  await new Promise(r => setTimeout(r, 0))
+  if (!enterPressed) fail('@keyup.enter failed to trigger on "Enter"')
+
+  // Test @click.once
+  const btnOnceEl = appKeyRefs.state.$refs.btnOnce
+  btnOnceEl.dispatchEvent(new domKeyRefs.window.Event('click'))
+  btnOnceEl.dispatchEvent(new domKeyRefs.window.Event('click'))
+  await new Promise(r => setTimeout(r, 0))
+  if (onceCount !== 1) {
+    fail(`@click.once expected to be called 1 time, but called ${onceCount} times`)
+  }
+
+  // Test $nextTick
+  let tickExecuted = false
+  await appKeyRefs.state.$nextTick(() => {
+    tickExecuted = true
+  })
+  if (!tickExecuted) fail('$nextTick callback failed to execute')
+
   console.log('All tests passed')
   process.exit(0)
 }

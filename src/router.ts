@@ -4,9 +4,11 @@ export type AsyncComponentLoader = () => Promise<ComponentDef | { default: Compo
 
 export interface RouteDef {
     path: string;
+    name?: string;
     component: ComponentDef | AsyncComponentLoader;
     children?: RouteDef[];
     transition?: string;
+    meta?: Record<string, any>;
 }
 
 export interface ProgressOptions {

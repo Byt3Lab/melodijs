@@ -4,56 +4,83 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MeloShop - Boutique de Vêtements</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <title>MelodiZon.fr : High-Tech, Informatique, Maison & Mode</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="styles.css">
 </head>
 
 <body>
     <div id="app">
-        <header class="header">
-            <div class="container">
-                <router-link to="/" class="logo">🛍️ MeloShop</router-link>
-                <nav class="nav">
-                    <router-link to="/">Accueil</router-link>
-                    <router-link to="/products">Produits</router-link>
-                    <router-link to="/cart" class="cart-link">
-                        🛒 Panier
-                        <span v-if="$store.getters.cartItemsCount > 0" class="badge">
-                            {{ $store.getters.cartItemsCount }}
-                        </span>
-                    </router-link>
-                </nav>
-            </div>
-        </header>
+        <!-- Header Amazon -->
+        <header class="amz-header">
+            <div class="amz-header-top">
+                <div class="amz-logo" id="amz-logo" @click="goHome">
+                    melodi<span>zon</span><small>.fr</small>
+                </div>
 
-        <main class="main">
-            <!-- Modal -->
-            <div v-if="modal.show" class="modal-overlay" @click="closeModal">
-                <div class="modal-content" @click.stop>
-                    <span class="modal-icon">✅</span>
-                    <h3 class="modal-title">Ajouté au panier !</h3>
-                    <p class="modal-message">
-                        <strong>{{ modal.productName }}</strong> a été ajouté à votre panier.
-                    </p>
-                    <div class="modal-actions">
-                        <button @click="goToCart" class="btn btn-primary btn-full">Voir le panier ({{
-                            $store.getters.cartTotal.toFixed(2) }}€)</button>
-                        <button @click="closeModal" class="btn btn-secondary btn-full">Continuer mes achats</button>
+                <div class="amz-deliver" @click="goHome">
+                    <span>Votre adresse de livraison :</span>
+                    <strong>📍 Paris 75001</strong>
+                </div>
+
+                <!-- Barre de recherche centrale Amazon -->
+                <div class="amz-search">
+                    <select class="amz-search-select" id="amz-category-select" v-model="$store.state.selectedCategory" @change="onCategoryChange">
+                        <option v-for="cat in categories" :key="cat.id" :value="cat.id">{{ cat.name }}</option>
+                    </select>
+                    <input
+                        id="amz-search-input"
+                        class="amz-search-input"
+                        v-model="$store.state.searchQuery"
+                        placeholder="Rechercher sur MelodiZon.fr..."
+                        @keyup.enter="goHome"
+                    />
+                    <button class="amz-search-btn" id="amz-search-btn" @click="goHome">🔍</button>
+                </div>
+
+                <div class="amz-nav-block" id="btn-latency-toggle" @click="toggleLatency">
+                    <span>Navigation Progress</span>
+                    <strong>⚡ Latence : {{ $store.state.navDelay }}ms</strong>
+                </div>
+
+                <div class="amz-nav-block" id="nav-orders" @click="goCart">
+                    <span>Retours</span>
+                    <strong>et Commandes ({{ $store.state.ordersCount }})</strong>
+                </div>
+
+                <div class="amz-cart-btn" id="amz-cart-link" @click="goCart">
+                    <span style="font-size: 1.5rem;">🛒</span>
+                    <div>
+                        <div class="amz-cart-count" id="cart-count-badge">{{ $store.getters.cartItemsCount }}</div>
+                        <strong style="font-size: 0.82rem;">Panier</strong>
                     </div>
                 </div>
             </div>
 
-            <transition name="fade">
-                <router-view></router-view>
-            </transition>
-        </main>
+            <!-- Sous-barre de catégories Amazon -->
+            <nav class="amz-subnav">
+                <div class="amz-subnav-links">
+                    <button
+                        v-for="cat in categories"
+                        :key="cat.id"
+                        :id="'subnav-' + cat.id"
+                        class="amz-subnav-item"
+                        :class="{ active: $store.state.selectedCategory === cat.id }"
+                        @click="selectCategory(cat.id)"
+                    >
+                        {{ cat.name }}
+                    </button>
+                </div>
+                <div style="color: #febd69; font-weight: 700; font-size: 0.82rem;">
+                    ✓prime Livraison GRATUITE en 1 jour ouvré | Route: <span id="amz-current-route">{{ $router.currentRoute() }}</span>
+                </div>
+            </nav>
+        </header>
 
-        <footer class="footer">
-            <div class="container">
-                <p>&copy; 2024 MeloShop - Powered by MelodiJS</p>
-            </div>
-        </footer>
+        <!-- Contenu principal -->
+        <main class="amz-container">
+            <router-view></router-view>
+        </main>
     </div>
 
     <script type="module">
@@ -62,308 +89,419 @@
         import { MelodiStore } from '../../dist/store.js';
         import { products, categories } from './products.js';
 
+        // --- 1. MelodiStore ---
         const store = new MelodiStore({
-            state: () => ({ cart: [], products: products }),
+            state: () => ({
+                products: products,
+                cart: [
+                    { ...products[0], quantity: 1 }
+                ],
+                selectedCategory: 'all',
+                searchQuery: '',
+                navDelay: 250,
+                ordersCount: 2,
+                lastAddedToast: ''
+            }),
             actions: {
-                addToCart(product) {
-                    const item = this.state.cart.find(i => i.id === product.id);
-                    if (item) item.quantity++;
-                    else this.state.cart.push({ ...product, quantity: 1 });
+                addToCart(ctx, payload) {
+                    const prod = payload.product || payload;
+                    const qty = payload.quantity || 1;
+                    const existing = this.state.cart.find(i => i.id === prod.id);
+                    if (existing) {
+                        existing.quantity += qty;
+                    } else {
+                        this.state.cart.push({ ...prod, quantity: qty });
+                    }
+                    this.state.lastAddedToast = prod.name;
                 },
-                removeFromCart(productId) {
+                removeFromCart(ctx, productId) {
                     const idx = this.state.cart.findIndex(i => i.id === productId);
                     if (idx !== -1) this.state.cart.splice(idx, 1);
                 },
-                updateQuantity(productId, qty) {
-                    const item = this.state.cart.find(i => i.id === productId);
+                updateQuantity(ctx, payload) {
+                    const item = this.state.cart.find(i => i.id === payload.id);
                     if (item) {
-                        if (qty <= 0) this.dispatch('removeFromCart', productId);
-                        else item.quantity = qty;
+                        if (payload.qty <= 0) {
+                            this.dispatch('removeFromCart', payload.id);
+                        } else {
+                            item.quantity = payload.qty;
+                        }
                     }
                 },
-                clearCart() { this.state.cart = []; }
+                completeOrder(ctx) {
+                    this.state.cart = [];
+                    this.state.ordersCount++;
+                }
             },
             getters: {
-                cartItemsCount: (s) => s.cart.reduce((t, i) => t + i.quantity, 0),
-                cartTotal: (s) => s.cart.reduce((t, i) => t + (i.price * i.quantity), 0)
+                cartItemsCount: (s) => s.cart.reduce((total, item) => total + item.quantity, 0),
+                cartTotal: (s) => s.cart.reduce((total, item) => total + (item.price * item.quantity), 0)
             }
         });
 
-        // Global modal function
-        window.showCartModal = function (productName) {
-            const event = new CustomEvent('open-cart-modal', { detail: { productName } });
-            window.dispatchEvent(event);
-        };
+        // --- 2. Pages ---
 
-        const Home = {
-            template: `
-                <div class="home">
-                    <div class="hero">
-                        <h1>Bienvenue chez MeloShop</h1>
-                        <p>Découvrez notre collection de vêtements tendance</p>
-                        <router-link to="/products" class="btn btn-primary">Découvrir la collection</router-link>
-                    </div>
-                    <div class="features">
-                        <div class="feature">
-                            <div class="feature-icon">✨</div>
-                            <h3>Qualité Premium</h3>
-                            <p>Des vêtements de haute qualité pour tous les styles</p>
-                        </div>
-                        <div class="feature">
-                            <div class="feature-icon">🚚</div>
-                            <h3>Livraison Rapide</h3>
-                            <p>Livraison gratuite à partir de 50€</p>
-                        </div>
-                        <div class="feature">
-                            <div class="feature-icon">↩️</div>
-                            <h3>Retours Faciles</h3>
-                            <p>30 jours pour changer d'avis</p>
-                        </div>
-                    </div>
-                </div>
-            `
-        };
-
-        const Products = {
-            data: () => ({ selectedCategory: 'all', searchQuery: '', categories }),
+        // Page 1 : Catalogue / Accueil Amazon (/)
+        const HomeCatalogPage = {
             computed: {
                 filteredProducts() {
-                    let f = this.$store.state.products;
-                    if (this.selectedCategory !== 'all') f = f.filter(p => p.category === this.selectedCategory);
-                    if (this.searchQuery) {
-                        const q = this.searchQuery.toLowerCase();
-                        f = f.filter(p => p.name.toLowerCase().includes(q) || p.description.toLowerCase().includes(q));
+                    let list = this.$store.state.products;
+                    const cat = this.$store.state.selectedCategory;
+                    const q = (this.$store.state.searchQuery || '').toLowerCase().trim();
+                    if (cat && cat !== 'all') {
+                        list = list.filter(p => p.category === cat);
                     }
-                    return f;
+                    if (q) {
+                        list = list.filter(p =>
+                            p.name.toLowerCase().includes(q) ||
+                            p.description.toLowerCase().includes(q) ||
+                            p.brand.toLowerCase().includes(q)
+                        );
+                    }
+                    return list;
                 }
             },
             methods: {
-                viewProduct(id) { window.location.hash = `#/product/${id}`; }
-            },
-            template: `
-                <div class="products-page">
-                    <h1>Nos Produits</h1>
-                    <div class="filters">
-                        <div class="search-box">
-                            <input v-model="searchQuery" placeholder="Rechercher..." class="search-input"/>
-                        </div>
-                        <div class="category-filters">
-                            <button v-for="cat in categories" :key="cat.id" @click="selectedCategory = cat.id" :class="{btn: true, 'btn-secondary': selectedCategory !== cat.id, 'btn-primary': selectedCategory === cat.id}">
-                                {{cat.name}}
-                            </button>
-                        </div>
-                    </div>
-                    <div v-if="filteredProducts.length === 0" class="no-products">Aucun produit trouvé</div>
-                    <div class="product-grid">
-                        <div v-for="p in filteredProducts" :key="p.id" class="product-card" @click="viewProduct(p.id)">
-                            <img :src="p.image" :alt="p.name" class="product-image">
-                            <div class="product-info">
-                                <h3>{{p.name}}</h3>
-                                <p class="product-description">{{p.description}}</p>
-                                <div class="product-footer">
-                                    <span class="price">{{p.price.toFixed(2)}}€</span>
-                                    <span class="view-details">Voir détails →</span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            `
-        };
-
-        const ProductDetail = {
-            data: () => ({ quantity: 1 }),
-            computed: {
-                productId() { return this.$router.params().id; },
-                product() { return this.$store.state.products.find(p => p.id === parseInt(this.productId)); }
-            },
-            methods: {
-                addToCart() {
-                    if (this.product) {
-                        for (let i = 0; i < this.quantity; i++) {
-                            this.$store.dispatch('addToCart', this.product);
-                        }
-                        alert("product add to cart name: " + this.product.name)
-                    }
+                openProduct(id) {
+                    this.$router.push('/product/' + id);
                 },
-                goBack() { window.location.hash = '#/products'; }
+                quickAdd(product) {
+                    this.$store.dispatch('addToCart', { product, quantity: 1 });
+                }
             },
             template: `
-                <div class="product-detail">
-                    <button @click="goBack" class="back-btn">← Retour aux produits</button>
-                    <div v-if="!product" class="not-found">
-                        <h2>Produit non trouvé</h2>
-                        <button @click="goBack" class="btn btn-primary">Retour</button>
-                    </div>
-                    <div v-else class="detail-container">
-                        <div class="detail-image">
-                            <img :src="product.image" :alt="product.name">
+                <div id="amz-home-page">
+                    <!-- Bannière Promo Amazon -->
+                    <section class="amz-hero">
+                        <div>
+                            <div class="amz-prime-tag">★ VENTES FLASH MELODIZON PRIME</div>
+                            <h1>Jusqu'à -30% sur le High-Tech & la Maison</h1>
+                            <p>Expédié par MelodiZon • Livraison prioritaire gratuite et retours sous 30 jours.</p>
                         </div>
-                        <div class="detail-info">
-                            <h1>{{product.name}}</h1>
-                            <p class="detail-price">{{product.price.toFixed(2)}}€</p>
-                            <p class="detail-description">{{product.description}}</p>
-                            <div class="detail-quantity">
-                                <label>Quantité:</label>
-                                <div class="quantity-selector">
-                                    <button @click="quantity = Math.max(1, quantity - 1)" class="qty-btn">-</button>
-                                    <span>{{quantity}}</span>
-                                    <button @click="quantity++" class="qty-btn">+</button>
+                        <div v-if="$store.state.lastAddedToast" id="amz-toast-banner" style="background: #067d62; padding: 10px 16px; border-radius: 6px; font-size: 0.85rem;">
+                            ✅ Ajouté au panier : <strong>{{ $store.state.lastAddedToast }}</strong>
+                        </div>
+                    </section>
+
+                    <!-- Grille de produits style Amazon -->
+                    <div class="amz-grid">
+                        <div class="amz-card" v-for="p in filteredProducts" :key="p.id" :id="'amz-product-card-' + p.id">
+                            <div>
+                                <div v-if="p.badge" class="amz-card-badge">{{ p.badge }}</div>
+                                <div class="amz-card-img-wrap" @click="openProduct(p.id)">
+                                    <img :src="p.image" :alt="p.name" class="amz-card-img" />
+                                </div>
+                                <div class="amz-card-title" :id="'amz-title-' + p.id" @click="openProduct(p.id)">
+                                    {{ p.name }}
+                                </div>
+                                <div class="amz-rating-row">
+                                    <span class="amz-stars">★★★★★ {{ p.rating }}</span>
+                                    <span class="amz-reviews">({{ p.reviewsCount }} évaluations)</span>
+                                </div>
+                                <div class="amz-price-row">
+                                    <span class="amz-price">{{ p.price.toFixed(2) }} €</span>
+                                    <span class="amz-old-price">Prix conseillé : {{ p.oldPrice.toFixed(2) }} €</span>
+                                </div>
+                                <div class="amz-delivery-text">
+                                    <span class="amz-prime-tag">✓prime</span> Livraison GRATUITE <strong>demain</strong>
                                 </div>
                             </div>
-                            <button @click="addToCart" class="btn btn-primary btn-large">Ajouter au panier</button>
+                            <div style="display: flex; flex-direction: column; gap: 8px;">
+                                <button class="amz-btn amz-btn-yellow" :id="'amz-add-btn-' + p.id" @click="quickAdd(p)">
+                                    Ajouter au panier
+                                </button>
+                                <button class="amz-btn amz-btn-light" :id="'amz-view-btn-' + p.id" @click="openProduct(p.id)">
+                                    Voir la fiche produit
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
             `
         };
 
-        const Cart = {
+        // Page 2 : Fiche Produit Détaillée Amazon (/product/:id)
+        const ProductDetailPage = {
+            data() {
+                return {
+                    qty: 1
+                };
+            },
             computed: {
-                cartItems() { return this.$store.state.cart; },
-                total() { return this.$store.getters.cartTotal; },
-                isEmpty() { return this.cartItems.length === 0; }
+                productId() {
+                    return Number((this.$router.params() && this.$router.params().id) || 1);
+                },
+                product() {
+                    return this.$store.state.products.find(p => p.id === this.productId) || this.$store.state.products[0];
+                },
+                relatedProducts() {
+                    return this.$store.state.products.filter(p => p.id !== this.product.id).slice(0, 3);
+                }
             },
             methods: {
-                updateQuantity(id, qty) {
-                    this.$store.dispatch('updateQuantity', id, qty);
+                addCurrentToCart() {
+                    this.$store.dispatch('addToCart', { product: this.product, quantity: Number(this.qty) || 1 });
+                },
+                buyNow() {
+                    this.addCurrentToCart();
+                    this.$router.push('/cart');
+                },
+                goBack() {
+                    this.$router.push('/');
+                },
+                switchProduct(id) {
+                    this.$router.push('/product/' + id);
+                }
+            },
+            template: `
+                <div class="amz-detail-page" id="amz-product-detail">
+                    <button class="amz-btn amz-btn-light" id="amz-back-catalog" style="width: auto; padding: 6px 16px;" @click="goBack">
+                        ‹ Retour aux résultats
+                    </button>
+
+                    <div class="amz-detail-grid">
+                        <!-- Colonne 1 : Image -->
+                        <div style="background: #f8f8f8; border-radius: 8px; padding: 20px; display: flex; align-items: center; justify-content: center;">
+                            <img :src="product.image" :alt="product.name" style="max-width: 100%; max-height: 360px; border-radius: 6px; object-fit: cover;" />
+                        </div>
+
+                        <!-- Colonne 2 : Informations Produit -->
+                        <div>
+                            <div style="color: var(--amz-link); font-size: 0.85rem; font-weight: 600; margin-bottom: 4px;">
+                                Visiter la boutique {{ product.brand }}
+                            </div>
+                            <h1 id="detail-product-title" style="font-size: 1.5rem; font-weight: 700; margin-bottom: 10px; line-height: 1.3;">
+                                {{ product.name }}
+                            </h1>
+                            <div class="amz-rating-row" style="padding-bottom: 12px; border-bottom: 1px solid #e7e7e7;">
+                                <span class="amz-stars">★★★★★ {{ product.rating }} sur 5</span>
+                                <span class="amz-reviews">{{ product.reviewsCount }} évaluations clients</span>
+                            </div>
+
+                            <div style="margin: 14px 0;">
+                                <div class="amz-price-row">
+                                    <span style="color: var(--amz-red); font-size: 1.3rem; font-weight: 500;">-17%</span>
+                                    <span class="amz-price" id="detail-product-price">{{ product.price.toFixed(2) }} €</span>
+                                </div>
+                                <div class="amz-old-price">Prix conseillé : {{ product.oldPrice.toFixed(2) }} € (TVA incluse)</div>
+                                <div style="margin-top: 6px;">
+                                    <span class="amz-prime-tag">✓prime</span> Retours GRATUITS
+                                </div>
+                            </div>
+
+                            <h3 style="font-size: 1rem; margin: 16px 0 8px;">À propos de cet article :</h3>
+                            <p style="line-height: 1.55; color: #333; margin-bottom: 12px;">{{ product.description }}</p>
+                            <ul style="padding-left: 20px; line-height: 1.6; color: #222;">
+                                <li v-for="spec in product.specs" :key="spec">{{ spec }}</li>
+                            </ul>
+                        </div>
+
+                        <!-- Colonne 3 : Buy Box Amazon -->
+                        <div class="amz-buy-box">
+                            <div class="amz-price" style="margin-bottom: 6px;">{{ product.price.toFixed(2) }} €</div>
+                            <div class="amz-delivery-text">
+                                <span class="amz-prime-tag">✓prime</span> Livraison GRATUITE <strong>demain matin</strong> vers Paris 75001.
+                            </div>
+                            <div class="amz-stock">En stock</div>
+
+                            <div style="margin: 14px 0; display: flex; align-items: center; gap: 10px;">
+                                <label style="font-size: 0.88rem; font-weight: 600;">Quantité :</label>
+                                <select id="detail-qty-select" v-model.number="qty" style="padding: 6px 10px; border-radius: 6px; border: 1px solid #bbb;">
+                                    <option value="1">1</option>
+                                    <option value="2">2</option>
+                                    <option value="3">3</option>
+                                </select>
+                            </div>
+
+                            <div style="display: flex; flex-direction: column; gap: 10px;">
+                                <button class="amz-btn amz-btn-yellow" id="detail-add-to-cart" @click="addCurrentToCart">
+                                    Ajouter au panier
+                                </button>
+                                <button class="amz-btn amz-btn-orange" id="detail-buy-now" @click="buyNow">
+                                    Acheter cet article
+                                </button>
+                            </div>
+
+                            <div style="margin-top: 14px; font-size: 0.78rem; color: var(--amz-muted); line-height: 1.5;">
+                                <div>Expédié par <strong>MelodiZon</strong></div>
+                                <div>Vendu par <strong>{{ product.brand }} Official</strong></div>
+                                <div>Transaction sécurisée SSL 256-bit</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Produits fréquemment achetés ensemble -->
+                    <div style="margin-top: 32px; padding-top: 20px; border-top: 1px solid #e7e7e7;">
+                        <h3 style="margin-bottom: 14px;">Les clients ayant consulté cet article ont également regardé</h3>
+                        <div class="amz-grid">
+                            <div class="amz-card" v-for="rel in relatedProducts" :key="rel.id">
+                                <div class="amz-card-title" @click="switchProduct(rel.id)">{{ rel.name }}</div>
+                                <div class="amz-price" style="font-size: 1.15rem; margin: 8px 0;">{{ rel.price.toFixed(2) }} €</div>
+                                <button class="amz-btn amz-btn-light" @click="switchProduct(rel.id)">Voir l'article</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `
+        };
+
+        // Page 3 : Panier & Paiement Amazon (/cart)
+        const CartPage = {
+            data() {
+                return {
+                    orderSuccess: false
+                };
+            },
+            computed: {
+                items() {
+                    return this.$store.state.cart;
+                },
+                total() {
+                    return this.$store.getters.cartTotal;
+                },
+                count() {
+                    return this.$store.getters.cartItemsCount;
+                }
+            },
+            methods: {
+                changeQty(id, nextQty) {
+                    this.$store.dispatch('updateQuantity', { id, qty: nextQty });
                 },
                 removeItem(id) {
                     this.$store.dispatch('removeFromCart', id);
                 },
-                goToCheckout() { window.location.hash = '#/checkout'; }
+                checkoutNow() {
+                    this.$store.dispatch('completeOrder');
+                    this.orderSuccess = true;
+                },
+                continueShopping() {
+                    this.$router.push('/');
+                }
             },
             template: `
-                <div class="cart-page">
-                    <h1>Mon Panier</h1>
-                    <div v-if="isEmpty" class="empty-cart">
-                        <p>Votre panier est vide</p>
-                        <router-link to="/products" class="btn btn-primary">Continuer mes achats</router-link>
-                    </div>
-                    <div v-else>
-                        <div class="cart-items">
-                            <div v-for="i in cartItems" :key="i.id + '-' + i.quantity" class="cart-item">
-                                <img :src="i.image" :alt="i.name" class="cart-item-image">
-                                <div class="cart-item-info">
-                                    <h3>{{i.name}}</h3>
-                                    <p>{{i.price.toFixed(2)}}€</p>
-                                </div>
-                                <div class="cart-item-quantity">
-                                    <button @click="updateQuantity(i.id, i.quantity - 1)" class="qty-btn">-</button>
-                                    <span>{{i.quantity}}</span>
-                                    <button @click="updateQuantity(i.id, i.quantity + 1)" class="qty-btn">+</button>
-                                </div>
-                                <div class="cart-item-total">{{(i.price * i.quantity).toFixed(2)}}€</div>
-                                <button @click="removeItem(i.id)" class="remove-btn">✕</button>
-                            </div>
+                <div class="amz-cart-layout" id="amz-cart-page">
+                    <div class="amz-cart-box">
+                        <div v-if="orderSuccess" id="amz-order-confirmed" style="padding: 24px; background: #f0fdf4; border: 1px solid #86efac; border-radius: 8px; margin-bottom: 20px;">
+                            <h2 style="color: #166534; margin-bottom: 8px;">✅ Merci, votre commande MelodiZon Prime est confirmée !</h2>
+                            <p style="margin-bottom: 14px;">Un récapitulatif d'expédition a été enregistré dans vos commandes.</p>
+                            <button class="amz-btn amz-btn-yellow" style="width: auto; padding: 8px 20px;" @click="continueShopping">
+                                Continuer vos achats
+                            </button>
                         </div>
-                        <div class="cart-summary">
-                            <div class="summary-row">
-                                <span>Total:</span>
-                                <strong>{{total.toFixed(2)}}€</strong>
-                            </div>
-                            <button @click="goToCheckout" class="btn btn-primary btn-large">Procéder au paiement</button>
-                        </div>
-                    </div>
-                </div>
-            `
-        };
 
-        const Checkout = {
-            data: () => ({
-                form: { name: '', email: '', address: '', city: '', zip: '', cardNumber: '' },
-                orderPlaced: false
-            }),
-            computed: {
-                total() { return this.$store.getters.cartTotal; },
-                isFormValid() {
-                    return this.form.name && this.form.email && this.form.address &&
-                        this.form.city && this.form.zip && this.form.cardNumber;
-                }
-            },
-            methods: {
-                placeOrder() {
-                    if (this.isFormValid) {
-                        this.orderPlaced = true;
-                        setTimeout(() => {
-                            this.$store.dispatch('clearCart');
-                            window.location.hash = '#/';
-                        }, 3000);
-                    }
-                }
-            },
-            template: `
-                <div class="checkout-page">
-                    <transition name="fade">
-                        <div v-if="orderPlaced" class="order-success">
-                            <h2>✅ Commande confirmée!</h2>
-                            <p>Merci pour votre achat. Vous allez être redirigé...</p>
+                        <h1 style="font-size: 1.65rem; padding-bottom: 12px; border-bottom: 1px solid #ddd;">
+                            Votre Panier MelodiZon
+                        </h1>
+
+                        <div v-if="items.length === 0 && !orderSuccess" style="padding: 32px 0;">
+                            <p style="font-size: 1.1rem; margin-bottom: 16px;">Votre panier MelodiZon est vide.</p>
+                            <button class="amz-btn amz-btn-yellow" style="width: auto; padding: 9px 22px;" @click="continueShopping">
+                                Découvrir les ventes flash du jour
+                            </button>
                         </div>
+
                         <div v-else>
-                            <h1>Finaliser la commande</h1>
-                            <div class="checkout-container">
-                                <div class="checkout-form">
-                                    <h3>Informations de livraison</h3>
-                                    <input v-model="form.name" placeholder="Nom complet" class="form-input"/>
-                                    <input v-model="form.email" type="email" placeholder="Email" class="form-input"/>
-                                    <input v-model="form.address" placeholder="Adresse" class="form-input"/>
-                                    <div class="form-row">
-                                        <input v-model="form.city" placeholder="Ville" class="form-input"/>
-                                        <input v-model="form.zip" placeholder="Code postal" class="form-input"/>
+                            <div class="amz-cart-item" v-for="item in items" :key="item.id" :id="'cart-row-' + item.id">
+                                <img :src="item.image" :alt="item.name" style="width: 120px; height: 120px; object-fit: cover; border-radius: 6px;" />
+                                <div>
+                                    <h3 style="font-size: 1.05rem; margin-bottom: 4px;">{{ item.name }}</h3>
+                                    <div class="amz-stock" style="font-size: 0.82rem; margin: 2px 0;">En stock</div>
+                                    <div class="amz-prime-tag" style="margin-bottom: 10px;">✓prime Éligible à la Livraison GRATUITE</div>
+                                    <div style="display: flex; align-items: center; gap: 10px;">
+                                        <button class="amz-btn amz-btn-light" style="width: 32px; padding: 4px;" @click="changeQty(item.id, item.quantity - 1)">-</button>
+                                        <strong :id="'cart-qty-' + item.id">{{ item.quantity }}</strong>
+                                        <button class="amz-btn amz-btn-light" :id="'cart-inc-' + item.id" style="width: 32px; padding: 4px;" @click="changeQty(item.id, item.quantity + 1)">+</button>
+                                        <button class="amz-btn amz-btn-light" style="width: auto; padding: 4px 12px; color: var(--amz-link);" @click="removeItem(item.id)">Supprimer</button>
                                     </div>
-                                    <h3>Paiement</h3>
-                                    <input v-model="form.cardNumber" placeholder="Numéro de carte" class="form-input"/>
                                 </div>
-                                <div class="checkout-summary">
-                                    <h3>Résumé</h3>
-                                    <div class="summary-row">
-                                        <span>Total:</span>
-                                        <strong>{{total.toFixed(2)}}€</strong>
-                                    </div>
-                                    <button @click="placeOrder" :disabled="!isFormValid" class="btn btn-primary btn-large">
-                                        Confirmer la commande
-                                    </button>
+                                <div style="font-size: 1.2rem; font-weight: 700;">
+                                    {{ (item.price * item.quantity).toFixed(2) }} €
                                 </div>
                             </div>
                         </div>
-                    </transition>
+                    </div>
+
+                    <!-- Résumé de commande à droite -->
+                    <div class="amz-cart-box" style="align-self: start;">
+                        <div style="color: var(--amz-green); font-size: 0.84rem; margin-bottom: 12px;">
+                            ✅ Votre commande est éligible à la <strong>Livraison GRATUITE</strong> en 1 jour.
+                        </div>
+                        <div style="font-size: 1.15rem; margin-bottom: 16px;">
+                            Sous-total ({{ count }} articles) : <strong id="amz-cart-subtotal">{{ total.toFixed(2) }} €</strong>
+                        </div>
+                        <button
+                            v-if="items.length > 0"
+                            class="amz-btn amz-btn-yellow"
+                            id="amz-checkout-btn"
+                            @click="checkoutNow"
+                        >
+                            Passer la commande en 1-Click
+                        </button>
+                    </div>
                 </div>
             `
         };
 
+        // --- 3. Router avec NavigationProgress Orange Amazon ---
         const router = new MelodiRouter({
             routes: [
-                { path: '/', component: Home },
-                { path: '/products', component: Products },
-                { path: '/product/:id', component: ProductDetail },
-                { path: '/cart', component: Cart },
-                { path: '/checkout', component: Checkout }
-            ]
+                { path: '/', component: HomeCatalogPage, transition: 'fade' },
+                {
+                    path: '/product/:id',
+                    component: () => new Promise(resolve => setTimeout(() => resolve(ProductDetailPage), 80)),
+                    transition: 'fade'
+                },
+                {
+                    path: '/cart',
+                    component: () => new Promise(resolve => setTimeout(() => resolve(CartPage), 80)),
+                    transition: 'fade'
+                }
+            ],
+            progress: {
+                enabled: true,
+                color: '#ff9900', // Orange Amazon
+                height: '3px',
+                speed: 180,
+                trickleSpeed: 80
+            }
         });
 
+        router.beforeEach((to, from, next) => {
+            const delay = (!from ? 0 : store.state.navDelay) || 0;
+            if (delay > 0) {
+                setTimeout(() => next(), delay);
+            } else {
+                next();
+            }
+        });
+
+        // --- 4. Application Racine ---
         const app = createApp({
-            data: () => ({
-                modal: { show: false, productName: '' }
-            }),
-            methods: {
-                closeModal() {
-                    this.modal.show = false;
-                },
-                goToCart() {
-                    this.modal.show = false;
-                    window.location.hash = '#/cart';
-                }
+            data() {
+                return {
+                    categories
+                };
             },
-            hooks: {
-                mounted() {
-                    // Listen for global modal events
-                    window.addEventListener('open-cart-modal', (e) => {
-                        this.modal.productName = e.detail.productName;
-                        this.modal.show = true;
-                    });
+            methods: {
+                goHome() {
+                    this.$router.push('/');
+                },
+                goCart() {
+                    this.$router.push('/cart');
+                },
+                selectCategory(catId) {
+                    this.$store.state.selectedCategory = catId;
+                    this.$router.push('/');
+                },
+                onCategoryChange() {
+                    this.$router.push('/');
+                },
+                toggleLatency() {
+                    this.$store.state.navDelay = this.$store.state.navDelay === 250 ? 700 : 250;
                 }
             }
         });
+
         app.use(store);
         app.use(router);
         app.mount('#app');

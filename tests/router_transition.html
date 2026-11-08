@@ -148,7 +148,7 @@
         <div class="nav">
             <router-link to="/">Home</router-link>
             <router-link to="/about">About</router-link>
-            <router-link to="/contact">Contact</router-link>
+            <router-link to="/contact">Contact (Async 800ms)</router-link>
         </div>
 
         <router-view></router-view>
@@ -162,13 +162,24 @@
             template: `
                 <div class="page page-a">
                     <h1>Home Page</h1>
-                    <p>Welcome to the home page. This page uses a <strong>Fade</strong> transition.</p>
-                    <button @click="goToAbout">Go to About (Programmatic)</button>
+                    <p>Welcome to the home page. Notice the YouTube-inspired top progress bar on navigation.</p>
+                    <div style="display: flex; gap: 10px; flex-wrap: wrap; justify-content: center;">
+                        <button @click="goToAbout">Go to About (Programmatic)</button>
+                        <button @click="goToContact">Go to Contact (Simulated 800ms Load)</button>
+                        <button @click="triggerManualProgress">Manual Progress Demo</button>
+                    </div>
                 </div>
             `,
             methods: {
                 goToAbout() {
                     this.$router.push('/about');
+                },
+                goToContact() {
+                    this.$router.push('/contact');
+                },
+                triggerManualProgress() {
+                    this.$router.progress.start();
+                    setTimeout(() => this.$router.progress.done(), 1000);
                 }
             }
         };
@@ -180,7 +191,7 @@
                     <p>This is the about page. It also uses a <strong>Fade</strong> transition.</p>
                     <div style="display: flex; gap: 10px;">
                         <button @click="goHome">Back Home</button>
-                        <button @click="goToContact">Go to Contact</button>
+                        <button @click="goToContact">Go to Contact (800ms)</button>
                     </div>
                 </div>
             `,
@@ -198,7 +209,7 @@
             template: `
                 <div class="page page-c">
                     <h1>Contact Page</h1>
-                    <p>This page uses a <strong>Slide</strong> transition. Notice how it slides in from the right.</p>
+                    <p>This page uses a <strong>Slide</strong> transition and simulated async loading.</p>
                     <button @click="goBack">Go Back (About)</button>
                 </div>
             `,
@@ -213,9 +224,23 @@
             routes: [
                 { path: '/', component: Home, transition: 'fade' },
                 { path: '/about', component: About, transition: 'fade' },
-                { path: '/contact', component: Contact, transition: 'slide' }
-            ]
+                {
+                    path: '/contact',
+                    component: () => new Promise(resolve => setTimeout(() => resolve(Contact), 800)),
+                    transition: 'slide'
+                }
+            ],
+            progress: {
+                color: '#ff0000',
+                height: '3px',
+                speed: 200
+            }
         });
+
+        router.on('navigation:start', (e) => console.log('[Router Event] navigation:start', e));
+        router.on('navigation:complete', (e) => console.log('[Router Event] navigation:complete', e));
+        router.on('navigation:cancelled', (e) => console.log('[Router Event] navigation:cancelled', e));
+        router.on('navigation:error', (e) => console.error('[Router Event] navigation:error', e));
 
         const app = createApp();
 

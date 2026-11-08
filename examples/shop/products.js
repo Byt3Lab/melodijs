@@ -1,106 +1,124 @@
 export const products = [
     {
         id: 1,
-        name: "T-Shirt Classic Blanc",
-        category: "t-shirts",
-        price: 29.99,
-        image: "https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=400",
-        description: "T-shirt en coton 100% bio, confortable et durable"
+        name: "Casque Sans Fil MelodiPods Pro Max - Réduction de Bruit Active",
+        category: "high-tech",
+        brand: "MelodiAudio",
+        price: 249.99,
+        oldPrice: 299.99,
+        rating: "4.8",
+        reviewsCount: 1842,
+        prime: true,
+        badge: "Choix d'Amazon",
+        image: "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=500",
+        description: "Audio spatial haute fidélité, autonomie de 40 heures, réduction de bruit adaptative et confort supra-auriculaire à mémoire de forme.",
+        specs: [
+            "Réduction active du bruit jusqu'à -42 dB",
+            "Autonomie 40h avec charge rapide USB-C (5 min = 4h)",
+            "Bluetooth 5.4 multipoint faible latence"
+        ]
     },
     {
         id: 2,
-        name: "T-Shirt Graphique Noir",
-        category: "t-shirts",
-        price: 34.99,
-        image: "https://images.unsplash.com/photo-1583743814966-8936f5b7be1a?w=400",
-        description: "Design moderne avec impression haute qualité"
+        name: "Montre Connectée Horizon Ultra GPS - Boîtier Titane",
+        category: "high-tech",
+        brand: "HorizonTech",
+        price: 189.00,
+        oldPrice: 229.00,
+        rating: "4.7",
+        reviewsCount: 956,
+        prime: true,
+        badge: "N°1 des ventes",
+        image: "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=500",
+        description: "Écran AMOLED Saphir toujours activé, suivi avancé de la fréquence cardiaque, GPS double fréquence et étanchéité 100m.",
+        specs: [
+            "Boîtier en titane aéronautique ultra-résistant",
+            "Jusqu'à 14 jours d'autonomie en usage standard",
+            "Plus de 120 modes sportifs et cartographie hors-ligne"
+        ]
     },
     {
         id: 3,
-        name: "T-Shirt Sport Bleu",
-        category: "t-shirts",
-        price: 39.99,
-        image: "https://images.unsplash.com/photo-1562157873-818bc0726f68?w=400",
-        description: "Tissu respirant parfait pour le sport"
+        name: "Clavier Mécanique Compact Sans Fil RGB - Switches Tactiles",
+        category: "informatique",
+        brand: "KeyCraft",
+        price: 109.90,
+        oldPrice: 139.90,
+        rating: "4.9",
+        reviewsCount: 614,
+        prime: true,
+        badge: "Vente Flash",
+        image: "https://images.unsplash.com/photo-1587829741301-dc798b83add3?w=500",
+        description: "Châssis en aluminium CNC, switches pré-lubrifiés remplaçables à chaud (Hot-Swap), triple connexion Bluetooth / 2.4GHz / USB-C.",
+        specs: [
+            "Format 75% ergonomique gain de place",
+            "Touches en PBT double-shot anti-usure",
+            "Compatible Windows, macOS et Linux"
+        ]
     },
     {
         id: 4,
-        name: "Jean Slim Bleu Foncé",
-        category: "jeans",
-        price: 79.99,
-        image: "https://images.unsplash.com/photo-1542272604-787c3835535d?w=400",
-        description: "Jean stretch confortable avec coupe moderne"
+        name: "Machine à Expresso Automatique Barista Pro 19 Bars",
+        category: "maison",
+        brand: "AromaCrema",
+        price: 329.00,
+        oldPrice: 399.00,
+        rating: "4.6",
+        reviewsCount: 2310,
+        prime: true,
+        badge: "Offre Star",
+        image: "https://images.unsplash.com/photo-1517668808822-9ebb02f2a0e6?w=500",
+        description: "Broyeur à grains conique en acier intégré, buse vapeur professionnelle pour cappuccino et écran tactile intuitif.",
+        specs: [
+            "13 réglages de mouture pour un arôme sur mesure",
+            "Chauffe thermoblock rapide en 25 secondes",
+            "Réservoir d'eau amovible de 2,2 litres"
+        ]
     },
     {
         id: 5,
-        name: "Jean Regular Noir",
-        category: "jeans",
-        price: 74.99,
-        image: "https://images.unsplash.com/photo-1475178626620-a4d074967452?w=400",
-        description: "Coupe classique, denim de qualité premium"
+        name: "Sac à Dos Urbain Imperméable pour Ordinateur 16 Pouces",
+        category: "mode",
+        brand: "NordicPack",
+        price: 59.99,
+        oldPrice: 79.99,
+        rating: "4.7",
+        reviewsCount: 1120,
+        prime: true,
+        badge: "",
+        image: "https://images.unsplash.com/photo-1553062407-98eeb64c6a62?w=500",
+        description: "Conçu en tissu Oxford déperlant recyclé avec compartiment antichoc pour ordinateur portable et poche antivol dorsale.",
+        specs: [
+            "Capacité modulable de 22L à 28L",
+            "Bretelles ergonomiques respirantes",
+            "Sangle bagage pour valise cabine"
+        ]
     },
     {
         id: 6,
-        name: "Jean Délavé Clair",
-        category: "jeans",
-        price: 69.99,
-        image: "https://images.unsplash.com/photo-1576995853123-5a10305d93c0?w=400",
-        description: "Style décontracté avec finition vintage"
-    },
-    {
-        id: 7,
-        name: "Veste en Jean Bleue",
-        category: "vestes",
-        price: 89.99,
-        image: "https://images.unsplash.com/photo-1551028719-00167b16eac5?w=400",
-        description: "Veste classique indémodable"
-    },
-    {
-        id: 8,
-        name: "Veste Bomber Noire",
-        category: "vestes",
-        price: 129.99,
-        image: "https://images.unsplash.com/photo-1591047139829-d91aecb6caea?w=400",
-        description: "Style urbain avec doublure matelassée"
-    },
-    {
-        id: 9,
-        name: "Veste Cuir Marron",
-        category: "vestes",
-        price: 199.99,
-        image: "https://images.unsplash.com/photo-1551028719-00167b16eac5?w=400",
-        description: "Cuir véritable, élégante et durable"
-    },
-    {
-        id: 10,
-        name: "Sweat à Capuche Gris",
-        category: "sweats",
-        price: 54.99,
-        image: "https://images.unsplash.com/photo-1556821840-3a63f95609a7?w=400",
-        description: "Confort optimal avec capuche ajustable"
-    },
-    {
-        id: 11,
-        name: "Sweat Zip Noir",
-        category: "sweats",
-        price: 59.99,
-        image: "https://images.unsplash.com/photo-1578587018452-892bacefd3f2?w=400",
-        description: "Fermeture éclair intégrale, poches latérales"
-    },
-    {
-        id: 12,
-        name: "Sweat College Blanc",
-        category: "sweats",
-        price: 49.99,
-        image: "https://images.unsplash.com/photo-1620799140408-edc6dcb6d633?w=400",
-        description: "Style décontracté avec logo brodé"
+        name: "Appareil Photo Hybride 4K 33MP avec Objectif 28-70mm",
+        category: "high-tech",
+        brand: "OptiLum",
+        price: 899.00,
+        oldPrice: 1049.00,
+        rating: "4.9",
+        reviewsCount: 418,
+        prime: true,
+        badge: "Choix d'Amazon",
+        image: "https://images.unsplash.com/photo-1516035069371-29a1b244cc32?w=500",
+        description: "Capteur plein format rétroéclairé, stabilisation 5 axes intégrée et mise au point automatique sur l'œil en temps réel.",
+        specs: [
+            "Enregistrement vidéo 4K 60p 10 bits",
+            "Écran orientable tactile haute luminosité",
+            "Double emplacement carte SD UHS-II"
+        ]
     }
 ];
 
 export const categories = [
-    { id: "all", name: "Tous" },
-    { id: "t-shirts", name: "T-Shirts" },
-    { id: "jeans", name: "Jeans" },
-    { id: "vestes", name: "Vestes" },
-    { id: "sweats", name: "Sweats" }
+    { id: "all", name: "Toutes nos catégories" },
+    { id: "high-tech", name: "High-Tech & Audio" },
+    { id: "informatique", name: "Informatique" },
+    { id: "maison", name: "Cuisine & Maison" },
+    { id: "mode", name: "Bagages & Mode" }
 ];

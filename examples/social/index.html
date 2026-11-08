@@ -1,16 +1,122 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="fr">
 
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MelodiBook</title>
+    <title>MelodiBook — Réseau Social (MelodiJS Router & Store)</title>
     <link rel="stylesheet" href="styles.css">
 </head>
 
 <body>
     <div id="app">
-        <router-view></router-view>
+        <!-- Barre de navigation supérieure type Facebook -->
+        <header class="fb-navbar">
+            <div class="fb-nav-left">
+                <div class="fb-logo-circle" id="fb-logo" @click="goFeed">f</div>
+                <div class="fb-search-pill">
+                    <span>🔍</span>
+                    <input
+                        id="fb-search-input"
+                        v-model="$store.state.searchQuery"
+                        placeholder="Rechercher sur MelodiBook"
+                    />
+                </div>
+            </div>
+
+            <nav class="fb-nav-center">
+                <button
+                    id="fb-tab-feed"
+                    class="fb-tab"
+                    :class="{ active: $router.currentRoute() === '/' }"
+                    @click="goFeed"
+                >
+                    🏠 Fil d'actualité
+                </button>
+                <button
+                    id="fb-tab-profile"
+                    class="fb-tab"
+                    :class="{ active: $router.currentRoute() === '/profile' }"
+                    @click="goProfile"
+                >
+                    👤 Profil
+                </button>
+                <button
+                    id="fb-tab-friends"
+                    class="fb-tab"
+                    :class="{ active: $router.currentRoute() === '/friends' }"
+                    @click="goFriends"
+                >
+                    👥 Amis ({{ $store.state.friends.length }})
+                </button>
+            </nav>
+
+            <div class="fb-nav-right">
+                <button class="fb-icon-btn" id="fb-latency-btn" @click="toggleLatency">
+                    ⚡ Nav : {{ $store.state.navDelay }}ms
+                </button>
+                <div class="fb-user-chip" id="fb-user-chip" @click="goProfile">
+                    <img :src="$store.state.user.avatar" class="fb-avatar" style="width: 28px; height: 28px;" />
+                    <span>{{ $store.state.user.name }}</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- Disposition Facebook à 3 colonnes -->
+        <div class="fb-layout">
+            <!-- Colonne gauche : Raccourcis Facebook -->
+            <aside class="fb-sidebar-left">
+                <div class="fb-side-item" @click="goProfile">
+                    <img :src="$store.state.user.avatar" class="fb-avatar" />
+                    <span>{{ $store.state.user.name }}</span>
+                </div>
+                <div class="fb-side-item" @click="goFriends">
+                    <span style="font-size: 1.3rem;">👥</span>
+                    <span>Retrouver des amis ({{ $store.state.suggestions.length }} invitations)</span>
+                </div>
+                <div class="fb-side-item" @click="goFeed">
+                    <span style="font-size: 1.3rem;">📰</span>
+                    <span>Fil d'actualité récent</span>
+                </div>
+                <div class="fb-side-item" @click="goProfile">
+                    <span style="font-size: 1.3rem;">⭐</span>
+                    <span>À propos & Photos</span>
+                </div>
+            </aside>
+
+            <!-- Colonne centrale : <router-view> -->
+            <main>
+                <router-view></router-view>
+            </main>
+
+            <!-- Colonne droite : Contacts en ligne & Infos Routeur -->
+            <aside class="fb-sidebar-right">
+                <div class="fb-card">
+                    <div style="font-weight: 700; color: var(--fb-muted); font-size: 0.85rem; margin-bottom: 8px;">
+                        ⚡ ÉTAT DU ROUTEUR MELODIJS
+                    </div>
+                    <div style="font-size: 0.85rem; line-height: 1.6;">
+                        <div>Route active : <strong id="fb-current-route">{{ $router.currentRoute() }}</strong></div>
+                        <div>Publications : <strong id="fb-posts-count">{{ $store.state.posts.length }}</strong></div>
+                        <div>Amis connectés : <strong id="fb-friends-count">{{ $store.state.friends.length }}</strong></div>
+                    </div>
+                </div>
+
+                <div style="font-weight: 700; color: var(--fb-muted); font-size: 0.9rem; margin: 14px 0 8px 8px;">
+                    Contacts en ligne
+                </div>
+                <div class="fb-side-item" v-for="friend in $store.state.friends" :key="friend.id">
+                    <div style="position: relative;">
+                        <img :src="friend.avatar" class="fb-avatar" />
+                        <span style="position: absolute; bottom: 0; right: 0; width: 10px; height: 10px; background: #31a24c; border-radius: 50%; border: 2px solid #fff;"></span>
+                    </div>
+                    <div>
+                        <div style="font-size: 0.9rem;">{{ friend.name }}</div>
+                        <div style="font-size: 0.75rem; color: var(--fb-muted);">{{ friend.role }}</div>
+                    </div>
+                </div>
+            </aside>
+        </div>
     </div>
 
     <script type="module">
@@ -18,214 +124,348 @@
         import { MelodiRouter } from '../../dist/router.js';
         import { MelodiStore } from '../../dist/store.js';
 
-        // --- Store ---
+        // --- 1. MelodiStore ---
         const store = new MelodiStore({
             state: () => ({
-                user: null, // { name, avatar }
+                user: {
+                    name: 'Gaëtan Gomsu',
+                    role: 'Architecte Frontend & Créateur MelodiJS',
+                    city: 'Paris, France',
+                    avatar: 'https://ui-avatars.com/api/?name=Gaetan+Gomsu&background=1877f2&color=fff'
+                },
+                searchQuery: '',
+                navDelay: 250,
+                friends: [
+                    { id: 101, name: 'Sarah Connor', role: 'Ingénieure UI', avatar: 'https://ui-avatars.com/api/?name=Sarah+Connor&background=0d9488&color=fff' },
+                    { id: 102, name: 'Thomas Anderson', role: 'Architecte Système', avatar: 'https://ui-avatars.com/api/?name=Thomas+Anderson&background=7c3aed&color=fff' },
+                    { id: 103, name: 'Elena Rostova', role: 'Product Designer', avatar: 'https://ui-avatars.com/api/?name=Elena+Rostova&background=e11d48&color=fff' }
+                ],
+                suggestions: [
+                    { id: 201, name: 'Lucas Martin', mutual: '12 amis en commun', role: 'Développeur TypeScript', avatar: 'https://ui-avatars.com/api/?name=Lucas+Martin&background=ea580c&color=fff' },
+                    { id: 202, name: 'Chloé Bernard', mutual: '8 amis en commun', role: 'Lead DevOps', avatar: 'https://ui-avatars.com/api/?name=Chloe+Bernard&background=2563eb&color=fff' },
+                    { id: 203, name: 'Amine Khelifi', mutual: '5 amis en commun', role: 'Fullstack Engineer', avatar: 'https://ui-avatars.com/api/?name=Amine+Khelifi&background=16a34a&color=fff' }
+                ],
                 posts: [
                     {
                         id: 1,
-                        author: 'MelodiJS Team',
-                        avatar: 'https://ui-avatars.com/api/?name=Melodi+JS&background=1877f2&color=fff',
-                        time: '2h',
-                        content: 'Welcome to MelodiBook! This is a demo built with MelodiJS 🎵',
-                        image: 'https://picsum.photos/seed/melodi/600/300',
-                        likes: 42,
-                        comments: 5,
+                        author: 'Gaëtan Gomsu',
+                        avatar: 'https://ui-avatars.com/api/?name=Gaetan+Gomsu&background=1877f2&color=fff',
+                        time: 'Il y a 1 heure · 🌐',
+                        content: 'Le nouveau système Navigation Progress est maintenant intégré nativement dans MelodiJS Router ! Zéro dépendance, réactivité chirurgicale et transitions fluides sans saut de scroll. 🚀🎵',
+                        image: 'https://images.unsplash.com/photo-1555066931-4365d14bab8c?w=700',
+                        likes: 48,
+                        commentsCount: 12,
+                        shares: 7,
                         isLiked: false
                     },
                     {
                         id: 2,
-                        author: 'John Doe',
-                        avatar: 'https://ui-avatars.com/api/?name=John+Doe&background=random',
-                        time: '4h',
-                        content: 'Just trying out the new router features. Scroll behavior is smooth! 😎',
-                        likes: 12,
-                        comments: 1,
+                        author: 'Sarah Connor',
+                        avatar: 'https://ui-avatars.com/api/?name=Sarah+Connor&background=0d9488&color=fff',
+                        time: 'Il y a 3 heures · 🌐',
+                        content: 'Impressionnée par la légèreté de MelodiJS (~3KB) comparé aux frameworks à Virtual DOM classiques. Les mises à jour directes du DOM changent tout !',
+                        image: '',
+                        likes: 29,
+                        commentsCount: 6,
+                        shares: 3,
                         isLiked: true
                     }
                 ]
             }),
             actions: {
-                login(username) {
-                    this.state.user = {
-                        name: username,
-                        avatar: `https://ui-avatars.com/api/?name=${username}&background=random`
-                    };
-                },
-                logout() {
-                    this.state.user = null;
-                },
-                addPost(content) {
-                    const newPost = {
+                addPost(ctx, text) {
+                    const clean = (text || '').trim();
+                    if (!clean) return;
+                    this.state.posts.unshift({
                         id: Date.now(),
                         author: this.state.user.name,
                         avatar: this.state.user.avatar,
-                        time: 'Just now',
-                        content: content,
-                        likes: 0,
-                        comments: 0,
-                        isLiked: false
-                    };
-                    this.state.posts.unshift(newPost);
+                        time: 'À l’instant · 🌐',
+                        content: clean,
+                        image: '',
+                        likes: 1,
+                        commentsCount: 0,
+                        shares: 0,
+                        isLiked: true
+                    });
                 },
-                toggleLike(postId) {
+                toggleLike(ctx, postId) {
                     const post = this.state.posts.find(p => p.id === postId);
                     if (post) {
                         post.isLiked = !post.isLiked;
                         post.likes += post.isLiked ? 1 : -1;
                     }
+                },
+                acceptFriend(ctx, suggestionId) {
+                    const idx = this.state.suggestions.findIndex(s => s.id === suggestionId);
+                    if (idx !== -1) {
+                        const person = this.state.suggestions[idx];
+                        this.state.suggestions.splice(idx, 1);
+                        this.state.friends.push({
+                            id: person.id,
+                            name: person.name,
+                            role: person.role,
+                            avatar: person.avatar
+                        });
+                    }
                 }
             }
         });
 
-        // --- Components ---
+        // --- 2. Pages ---
 
-        const Post = {
-            props: ['post'],
-            methods: {
-                like() {
-                    this.$store.dispatch('toggleLike', this.post.id);
-                }
+        // Page 1 : Fil d'actualité Facebook (/)
+        const FeedPage = {
+            data() {
+                return {
+                    newPostText: ''
+                };
             },
-            template: `
-                <div class="post-card">
-                    <div class="post-header">
-                        <div class="post-author">
-                            <img :src="post.avatar" class="user-avatar">
-                            <div>
-                                <div class="author-name">{{post.author}}</div>
-                                <div class="post-time">{{post.time}}</div>
-                            </div>
-                        </div>
-                        <div class="post-menu">...</div>
-                    </div>
-                    <div class="post-content">
-                        {{post.content}}
-                    </div>
-                    <img v-if="post.image" :src="post.image" class="post-image">
-                    <div class="post-stats">
-                        <span>{{post.likes}} Likes</span>
-                        <span>{{post.comments}} Comments</span>
-                    </div>
-                    <div class="post-actions">
-                        <button class="action-btn like-btn" :class="{liked: post.isLiked}" @click="like">
-                            👍 Like
-                        </button>
-                        <button class="action-btn">💬 Comment</button>
-                        <button class="action-btn">share Share</button>
-                    </div>
-                </div>
-            `
-        };
-
-        const CreatePost = {
-            data: () => ({ content: '' }),
-            methods: {
-                submit() {
-                    if (this.content.trim()) {
-                        this.$store.dispatch('addPost', this.content);
-                        this.content = '';
-                    }
-                }
-            },
-            template: `
-                <div class="create-post">
-                    <div class="create-input-row">
-                        <img :src="$store.state.user.avatar" class="user-avatar">
-                        <input v-model="content" placeholder="What's on your mind?" class="post-input" @keyup.enter="submit">
-                    </div>
-                    <div class="create-actions">
-                        <button class="action-btn">🎥 Live Video</button>
-                        <button class="action-btn">📷 Photo/Video</button>
-                        <button class="action-btn">😊 Feeling/Activity</button>
-                    </div>
-                </div>
-            `
-        };
-
-        const Feed = {
-            components: { 'post-card': Post, 'create-post': CreatePost },
             computed: {
-                posts() { return this.$store.state.posts; }
+                filteredPosts() {
+                    const q = (this.$store.state.searchQuery || '').toLowerCase().trim();
+                    if (!q) return this.$store.state.posts;
+                    return this.$store.state.posts.filter(p =>
+                        p.content.toLowerCase().includes(q) ||
+                        p.author.toLowerCase().includes(q)
+                    );
+                }
             },
-            template: `
-                <div class="feed">
-                    <create-post></create-post>
-                    <post-card v-for="p in posts" :key="p.id" :post="p"></post-card>
-                </div>
-            `
-        };
-
-        const SidebarLeft = {
-            template: `
-                <div class="sidebar-left">
-                    <div class="menu-item">
-                        <img :src="$store.state.user.avatar" class="menu-icon">
-                        <span class="menu-text">{{$store.state.user.name}}</span>
-                    </div>
-                    <div class="menu-item">
-                        <div class="menu-icon">👥</div>
-                        <span class="menu-text">Friends</span>
-                    </div>
-                    <div class="menu-item">
-                        <div class="menu-icon">🏪</div>
-                        <span class="menu-text">Marketplace</span>
-                    </div>
-                    <div class="menu-item">
-                        <div class="menu-icon">📺</div>
-                        <span class="menu-text">Watch</span>
-                    </div>
-                    <div class="menu-item">
-                        <div class="menu-icon">⏰</div>
-                        <span class="menu-text">Memories</span>
-                    </div>
-                </div>
-            `
-        };
-
-        const Header = {
             methods: {
-                logout() {
-                    this.$store.dispatch('logout');
-                    this.$router.push('/login');
+                publishPost() {
+                    if (this.newPostText.trim()) {
+                        this.$store.dispatch('addPost', this.newPostText);
+                        this.newPostText = '';
+                    }
+                },
+                likePost(id) {
+                    this.$store.dispatch('toggleLike', id);
+                },
+                openProfile() {
+                    this.$router.push('/profile');
                 }
             },
             template: `
-                <header class="header">
-                    <div class="header-left">
-                        <router-link to="/" class="logo">melodibook</router-link>
-                    </div>
-                    <div class="header-center">
-                        <div class="search-bar">
-                            <span>🔍</span>
-                            <input type="text" placeholder="Search MelodiBook" class="search-input">
+                <div id="fb-feed-page">
+                    <!-- Barre de Stories Facebook -->
+                    <div class="fb-stories">
+                        <div class="fb-story-card" style="background: linear-gradient(160deg, #1877f2, #1e3a8a);" @click="openProfile">
+                            <div class="fb-story-ring">＋</div>
+                            <span>Créer une story</span>
+                        </div>
+                        <div class="fb-story-card" style="background: linear-gradient(160deg, #059669, #064e3b);">
+                            <div class="fb-story-ring">🎵</div>
+                            <span>MelodiJS 2.0</span>
+                        </div>
+                        <div class="fb-story-card" style="background: linear-gradient(160deg, #7c3aed, #3b0764);">
+                            <div class="fb-story-ring">⚡</div>
+                            <span>Sarah Connor</span>
+                        </div>
+                        <div class="fb-story-card" style="background: linear-gradient(160deg, #e11d48, #4c0519);">
+                            <div class="fb-story-ring">🚀</div>
+                            <span>Elena Rostova</span>
                         </div>
                     </div>
-                    <div class="header-right">
-                        <div class="nav-icons">
-                            <div class="nav-icon" @click="logout" title="Logout">🚪</div>
+
+                    <!-- Boîte de création de publication -->
+                    <div class="fb-card">
+                        <div class="fb-composer-top">
+                            <img :src="$store.state.user.avatar" class="fb-avatar" />
+                            <input
+                                id="fb-post-input"
+                                class="fb-composer-input"
+                                v-model="newPostText"
+                                placeholder="Que voulez-vous dire, Gaëtan ?"
+                                @keyup.enter="publishPost"
+                            />
+                        </div>
+                        <div class="fb-composer-actions">
+                            <div style="display: flex; gap: 6px;">
+                                <button class="fb-action-pill">🎥 Vidéo en direct</button>
+                                <button class="fb-action-pill">📷 Photo/vidéo</button>
+                                <button class="fb-action-pill">😊 Humeur</button>
+                            </div>
+                            <button class="fb-btn-primary" id="fb-publish-btn" @click="publishPost">
+                                Publier
+                            </button>
                         </div>
                     </div>
-                </header>
+
+                    <!-- Liste des publications -->
+                    <div class="fb-card" v-for="post in filteredPosts" :key="post.id" :id="'fb-post-' + post.id">
+                        <div class="fb-post-header">
+                            <div class="fb-post-author">
+                                <img :src="post.avatar" class="fb-avatar" />
+                                <div>
+                                    <div class="fb-author-name" @click="openProfile">{{ post.author }}</div>
+                                    <div class="fb-post-time">{{ post.time }}</div>
+                                </div>
+                            </div>
+                            <span style="color: var(--fb-muted); cursor: pointer;">•••</span>
+                        </div>
+
+                        <div class="fb-post-text" :id="'fb-post-text-' + post.id">{{ post.content }}</div>
+
+                        <img v-if="post.image" :src="post.image" class="fb-post-img" />
+
+                        <div class="fb-post-stats">
+                            <span :id="'fb-likes-count-' + post.id">👍 ❤️ {{ post.likes }} personnes</span>
+                            <span>{{ post.commentsCount }} commentaires • {{ post.shares }} partages</span>
+                        </div>
+
+                        <div class="fb-post-footer">
+                            <button
+                                class="fb-post-btn"
+                                :id="'fb-like-btn-' + post.id"
+                                :class="{ liked: post.isLiked }"
+                                @click="likePost(post.id)"
+                            >
+                                👍 {{ post.isLiked ? 'Aimé' : 'J’aime' }}
+                            </button>
+                            <button class="fb-post-btn">💬 Commenter</button>
+                            <button class="fb-post-btn">↗ Partager</button>
+                        </div>
+                    </div>
+                </div>
             `
         };
 
-        const MainLayout = {
-            components: { 'app-header': Header, 'sidebar-left': SidebarLeft },
+        // Page 2 : Page Profil Utilisateur Facebook (/profile)
+        const ProfilePage = {
+            computed: {
+                user() {
+                    return this.$store.state.user;
+                },
+                myPosts() {
+                    return this.$store.state.posts.filter(p => p.author === this.user.name);
+                }
+            },
+            methods: {
+                backToFeed() {
+                    this.$router.push('/');
+                },
+                goToFriends() {
+                    this.$router.push('/friends');
+                }
+            },
             template: `
-                <div>
-                    <app-header></app-header>
-                    <div class="main-container">
-                        <sidebar-left></sidebar-left>
-                        <div class="feed">
-                            <router-view></router-view>
+                <div id="fb-profile-page">
+                    <!-- En-tête de profil avec couverture -->
+                    <div class="fb-cover"></div>
+                    <div class="fb-profile-bar">
+                        <div style="display: flex; align-items: flex-end; gap: 18px;">
+                            <img :src="user.avatar" class="fb-profile-avatar-lg" />
+                            <div style="padding-bottom: 6px;">
+                                <h1 id="fb-profile-name" style="font-size: 1.75rem; font-weight: 800;">{{ user.name }}</h1>
+                                <div style="color: var(--fb-muted); font-weight: 600; font-size: 0.92rem;">
+                                    {{ $store.state.friends.length }} amis • {{ user.role }}
+                                </div>
+                            </div>
                         </div>
-                        <div class="sidebar-right">
-                            <div class="menu-text" style="color: #65676b; margin-bottom: 10px;">Contacts</div>
-                             <div class="menu-item">
-                                <img src="https://ui-avatars.com/api/?name=Alice&background=random" class="user-avatar" style="margin-right: 10px;">
-                                <span>Alice</span>
+                        <div style="display: flex; gap: 8px;">
+                            <button class="fb-btn-primary" @click="goToFriends">👥 Voir les amis</button>
+                            <button class="fb-icon-btn" @click="backToFeed">← Retour au fil</button>
+                        </div>
+                    </div>
+
+                    <!-- Section Intro + Publications -->
+                    <div class="fb-card">
+                        <h3 style="margin-bottom: 10px;">Intro</h3>
+                        <p style="margin-bottom: 8px; color: #333;">💼 {{ user.role }}</p>
+                        <p style="margin-bottom: 8px; color: #333;">📍 Habite à <strong>{{ user.city }}</strong></p>
+                        <p style="color: #333;">🌐 Créateur de <strong>MelodiJS Framework</strong></p>
+                    </div>
+
+                    <div class="fb-card" v-for="post in myPosts" :key="post.id">
+                        <div class="fb-post-header">
+                            <div class="fb-post-author">
+                                <img :src="post.avatar" class="fb-avatar" />
+                                <div>
+                                    <div class="fb-author-name">{{ post.author }}</div>
+                                    <div class="fb-post-time">{{ post.time }}</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="fb-post-text">{{ post.content }}</div>
+                        <div class="fb-post-stats">
+                            <span>👍 {{ post.likes }} J’aime</span>
+                            <span>{{ post.commentsCount }} commentaires</span>
+                        </div>
+                    </div>
+                </div>
+            `
+        };
+
+        // Page 3 : Page Amis & Invitations Facebook (/friends)
+        const FriendsPage = {
+            computed: {
+                suggestions() {
+                    return this.$store.state.suggestions;
+                },
+                friends() {
+                    return this.$store.state.friends;
+                }
+            },
+            methods: {
+                confirmFriend(id) {
+                    this.$store.dispatch('acceptFriend', id);
+                },
+                backToFeed() {
+                    this.$router.push('/');
+                }
+            },
+            template: `
+                <div id="fb-friends-page">
+                    <div class="fb-card">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
+                            <h2 style="font-size: 1.3rem;">Invitations d'amis ({{ suggestions.length }})</h2>
+                            <button class="fb-icon-btn" @click="backToFeed">← Fil d'actualité</button>
+                        </div>
+
+                        <div v-if="suggestions.length === 0" style="padding: 16px 0; color: var(--fb-muted);">
+                            ✅ Toutes les invitations ont été acceptées !
+                        </div>
+
+                        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 14px;">
+                            <div
+                                v-for="sug in suggestions"
+                                :key="sug.id"
+                                :id="'fb-suggestion-' + sug.id"
+                                style="border: 1px solid #ddd; border-radius: 8px; overflow: hidden; background: #fff;"
+                            >
+                                <div style="height: 110px; background: #e4e6eb; display: flex; align-items: center; justify-content: center;">
+                                    <img :src="sug.avatar" style="width: 72px; height: 72px; border-radius: 50%;" />
+                                </div>
+                                <div style="padding: 12px;">
+                                    <div style="font-weight: 700; font-size: 0.95rem; margin-bottom: 4px;">{{ sug.name }}</div>
+                                    <div style="font-size: 0.78rem; color: var(--fb-muted); margin-bottom: 4px;">{{ sug.role }}</div>
+                                    <div style="font-size: 0.75rem; color: var(--fb-muted); margin-bottom: 10px;">{{ sug.mutual }}</div>
+                                    <button
+                                        class="fb-btn-primary"
+                                        style="width: 100%;"
+                                        :id="'fb-accept-' + sug.id"
+                                        @click="confirmFriend(sug.id)"
+                                    >
+                                        Confirmer
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="fb-card">
+                        <h3 style="margin-bottom: 12px;">Tous vos amis ({{ friends.length }})</h3>
+                        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px;">
+                            <div
+                                v-for="f in friends"
+                                :key="f.id"
+                                style="display: flex; align-items: center; gap: 12px; padding: 10px; border: 1px solid #e4e6eb; border-radius: 8px;"
+                            >
+                                <img :src="f.avatar" class="fb-avatar" style="width: 48px; height: 48px;" />
+                                <div>
+                                    <div style="font-weight: 700; font-size: 0.95rem;">{{ f.name }}</div>
+                                    <div style="font-size: 0.8rem; color: var(--fb-muted);">{{ f.role }}</div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -233,64 +473,60 @@
             `
         };
 
-        const Login = {
-            data: () => ({ username: '' }),
-            methods: {
-                login() {
-                    if (this.username) {
-                        this.$store.dispatch('login', this.username);
-                        const redirect = this.$router.query().redirect || '/';
-                        this.$router.push(redirect);
-                    }
-                }
-            },
-            template: `
-                <div class="login-page">
-                    <div style="margin-bottom: 20px;">
-                        <h1 style="color: var(--primary); font-size: 40px;">melodibook</h1>
-                    </div>
-                    <div class="login-card">
-                        <input v-model="username" placeholder="Email or Phone Number" class="login-input" @keyup.enter="login">
-                        <input type="password" placeholder="Password" class="login-input">
-                        <button @click="login" class="btn-primary">Log In</button>
-                        <div style="margin-top: 16px;">
-                            <a href="#" style="color: var(--primary); text-decoration: none; font-size: 14px;">Forgot Password?</a>
-                        </div>
-                        <hr style="margin: 20px 0; border: 0; border-top: 1px solid #dadde1;">
-                        <button style="background: #42b72a; color: white; border: none; padding: 10px 16px; border-radius: 6px; font-weight: bold; font-size: 17px; cursor: pointer;">Create New Account</button>
-                    </div>
-                </div>
-            `
-        };
-
-        // --- Router ---
+        // --- 3. Router avec NavigationProgress Bleu Facebook ---
         const router = new MelodiRouter({
             routes: [
+                { path: '/', component: FeedPage, transition: 'fade' },
                 {
-                    path: '/',
-                    component: MainLayout,
-                    children: [
-                        { path: '', component: Feed },
-                        { path: 'profile', component: { template: '<div><h2>Profile Page</h2><p>Coming soon...</p></div>' } }
-                    ]
+                    path: '/profile',
+                    component: () => new Promise(resolve => setTimeout(() => resolve(ProfilePage), 80)),
+                    transition: 'fade'
                 },
-                { path: '/login', component: Login }
-            ]
+                {
+                    path: '/friends',
+                    component: () => new Promise(resolve => setTimeout(() => resolve(FriendsPage), 80)),
+                    transition: 'fade'
+                }
+            ],
+            progress: {
+                enabled: true,
+                color: '#1877f2', // Bleu Facebook
+                height: '3px',
+                speed: 180,
+                trickleSpeed: 80
+            }
         });
 
-
-
-        // Navigation Guard
         router.beforeEach((to, from, next) => {
-            const isAuthenticated = !!store.state.user;
-            if (to !== '/login' && !isAuthenticated) {
-                next('/login?redirect=' + to);
+            const delay = (!from ? 0 : store.state.navDelay) || 0;
+            if (delay > 0) {
+                setTimeout(() => next(), delay);
             } else {
                 next();
             }
         });
 
-        const app = createApp({});
+        // --- 4. Application Racine ---
+        const app = createApp({
+            data() {
+                return {};
+            },
+            methods: {
+                goFeed() {
+                    this.$router.push('/');
+                },
+                goProfile() {
+                    this.$router.push('/profile');
+                },
+                goFriends() {
+                    this.$router.push('/friends');
+                },
+                toggleLatency() {
+                    this.$store.state.navDelay = this.$store.state.navDelay === 250 ? 700 : 250;
+                }
+            }
+        });
+
         app.use(store);
         app.use(router);
         app.mount('#app');

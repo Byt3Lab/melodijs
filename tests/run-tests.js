@@ -424,6 +424,243 @@ async function run(){
   })
   if (!tickExecuted) fail('$nextTick callback failed to execute')
 
+  // --- TEST Router Navigation Progress & Lifecycle Events ---
+  const routerDistPath = path.join(__dirname, '..', 'dist', 'router.js')
+  const routerModPath = pathToFileURL(routerDistPath).href
+  const { MelodiRouter } = await import(routerModPath)
+
+  const domRouter = new JSDOM(
+    `<!doctype html><html><head></head><body><div id="app"><nav><router-link id="link-about" to="/about">About</router-link></nav><router-view></router-view></div></body></html>`,
+    { url: 'http://localhost/#/', runScripts: 'outside-only' }
+  )
+  global.window = domRouter.window
+  global.document = domRouter.window.document
+  global.HTMLElement = domRouter.window.HTMLElement
+
+  const navEvents = []
+  let afterEachCalls = 0
+  let asyncGuardDelay = 0
+  let cancelNextNav = false
+  let throwInNextNav = false
+
+  const HomeComp = { template: '<div id="page-home">Home Page</div>' }
+  const AboutComp = { template: '<div id="page-about">About Page</div>' }
+  const AsyncComp = () => new Promise(resolve => {
+    setTimeout(() => {
+      resolve({ template: '<div id="page-async">Async Loaded Page</div>' })
+    }, 30)
+  })
+  const SlowComp = () => new Promise(resolve => {
+    setTimeout(() => {
+      resolve({ template: '<div id="page-slow">Slow Page</div>' })
+    }, 80)
+  })
+  const FastComp = { template: '<div id="page-fast">Fast Page</div>' }
+
+  const router = new MelodiRouter({
+    routes: [
+      { path: '/', component: HomeComp },
+      { path: '/about', component: AboutComp },
+      { path: '/async', component: AsyncComp },
+      { path: '/slow', component: SlowComp },
+      { path: '/fast', component: FastComp }
+    ],
+    progress: {
+      color: '#ff0000',
+      height: '3px',
+      speed: 40,
+      trickleSpeed: 15,
+      showSpinner: false
+    }
+  })
+
+  router.on('navigation:start', (e) => navEvents.push({ type: 'start', to: e.to, from: e.from, id: e.navigationId }))
+  router.on('navigation:complete', (e) => navEvents.push({ type: 'complete', to: e.to, from: e.from, id: e.navigationId }))
+  router.on('navigation:cancelled', (e) => navEvents.push({ type: 'cancelled', to: e.to, reason: e.reason, id: e.navigationId }))
+  router.on('navigation:error', (e) => navEvents.push({ type: 'error', to: e.to, error: e.error, id: e.navigationId }))
+  router.afterEach(() => { afterEachCalls++ })
+
+  router.beforeEach((to, from, next) => {
+    if (throwInNextNav) {
+      throwInNextNav = false
+      throw new Error('Guard Failure')
+    }
+    if (cancelNextNav) {
+      cancelNextNav = false
+      next(false)
+      return
+    }
+    if (asyncGuardDelay > 0) {
+      const d = asyncGuardDelay
+      asyncGuardDelay = 0
+      setTimeout(() => next(), d)
+    } else {
+      next()
+    }
+  })
+
+  const appRouter = createAppDelim({ data() { return {} } })
+  appRouter.use(router)
+  await appRouter.mount('#app')
+  await new Promise(r => setTimeout(r, 10))
+
+  if (!domRouter.window.document.getElementById('page-home')) {
+    fail('router: initial Home component failed to mount')
+  }
+
+  // 1. Test navigation via <router-link> + async guard progress trickle
+  asyncGuardDelay = 45
+  const linkAbout = domRouter.window.document.querySelector('#link-about a')
+  linkAbout.dispatchEvent(new domRouter.window.Event('click', { bubbles: true, cancelable: true }))
+
+  // Immediately after navigation starts, progress bar should be active and in DOM
+  const progressContainer = domRouter.window.document.querySelector('.melodi-progress')
+  const progressBar = domRouter.window.document.querySelector('.melodi-progress-bar')
+  if (!progressContainer || !progressBar) {
+    fail('router progress: .melodi-progress or .melodi-progress-bar not created in DOM')
+  }
+  if (!router.progress.isActive) {
+    fail('router progress: expected isActive=true during async guard')
+  }
+  if (progressContainer.style.height !== '3px') {
+    fail(`router progress: expected custom height 3px, got ${progressContainer.style.height}`)
+  }
+  if (domRouter.window.document.querySelector('.melodi-progress-spinner')) {
+    fail('router progress: spinner should not be rendered when showSpinner is false')
+  }
+
+  const initialStatus = router.progress.status
+  await new Promise(r => setTimeout(r, 25))
+  const midStatus = router.progress.status
+  if (!(midStatus > initialStatus)) {
+    fail(`router progress: expected progressive trickle (${midStatus} > ${initialStatus})`)
+  }
+
+  // Wait for navigation and mount to complete
+  await new Promise(r => setTimeout(r, 50))
+  if (router.progress.isActive) {
+    fail('router progress: expected isActive=false after navigation completes')
+  }
+  if (!domRouter.window.document.getElementById('page-about')) {
+    fail('router: About component not mounted after navigation')
+  }
+
+  // 2. Test async component loading (waits for component loader + mount before completing progress & scrolling)
+  let scrollCalls = 0
+  domRouter.window.scrollTo = () => { scrollCalls++ }
+  // Simulate non-jsdom userAgent temporarily to verify _applyScroll timing
+  const origUA = domRouter.window.navigator.userAgent
+  Object.defineProperty(domRouter.window.navigator, 'userAgent', { value: 'Mozilla/5.0 Chrome', configurable: true })
+
+  router.push('/async')
+  if (!router.progress.isActive) {
+    fail('router progress: should be active while async component is loading')
+  }
+  if (scrollCalls !== 0) {
+    fail('router scroll: window.scrollTo must NOT be called before async route component finishes mounting')
+  }
+  if (domRouter.window.location.hash === '#/async') {
+    fail('router url: URL hash should not mutate before async guard/component commits')
+  }
+  await new Promise(r => setTimeout(r, 50))
+  if (router.progress.isActive) {
+    fail('router progress: should be done after async component finishes mounting')
+  }
+  if (!domRouter.window.document.getElementById('page-async')) {
+    fail('router: Async component failed to mount')
+  }
+  if (scrollCalls !== 1) {
+    fail(`router scroll: expected window.scrollTo to be called once after mount, got ${scrollCalls}`)
+  }
+  Object.defineProperty(domRouter.window.navigator, 'userAgent', { value: origUA, configurable: true })
+
+  // 3. Test explicit cancellation via next(false)
+  cancelNextNav = true
+  router.push('/about')
+  if (router.progress.isActive) {
+    fail('router progress: should stop immediately when guard calls next(false)')
+  }
+  if (router.currentRoute() !== '/async') {
+    fail(`router: route should remain '/async' after cancelled navigation, got '${router.currentRoute()}'`)
+  }
+  const cancelledGuardEvent = navEvents.find(e => e.type === 'cancelled' && e.reason === 'guard')
+  if (!cancelledGuardEvent) {
+    fail('router events: expected navigation:cancelled with reason="guard"')
+  }
+
+  // 4. Test concurrent / rapid successive navigations (slow '/slow' superseded by fast '/fast')
+  router.push('/slow')
+  const slowNavActive = router.progress.isActive
+  if (!slowNavActive) fail('router progress: expected active on /slow start')
+  await new Promise(r => setTimeout(r, 15))
+  // Before '/slow' finishes (takes 80ms), navigate to '/fast'
+  router.push('/fast')
+  await new Promise(r => setTimeout(r, 15))
+  if (router.currentRoute() !== '/fast' || !domRouter.window.document.getElementById('page-fast')) {
+    fail('router concurrency: /fast should be active and mounted')
+  }
+  // Wait for '/slow' promise to resolve in background (80ms total) and verify it does NOT overwrite '/fast'
+  await new Promise(r => setTimeout(r, 85))
+  if (router.currentRoute() !== '/fast' || !domRouter.window.document.getElementById('page-fast')) {
+    fail('router concurrency: stale /slow navigation overwrote newer /fast navigation!')
+  }
+  const supersededEvent = navEvents.find(e => e.type === 'cancelled' && e.to === '/slow' && e.reason === 'superseded')
+  if (!supersededEvent) {
+    fail('router concurrency: expected navigation:cancelled with reason="superseded" for /slow')
+  }
+
+  // 5. Test error handling in navigation
+  throwInNextNav = true
+  router.push('/about')
+  const errorEvent = navEvents.find(e => e.type === 'error' && e.to === '/about')
+  if (!errorEvent) {
+    fail('router error: expected navigation:error event when guard throws')
+  }
+  if (!progressContainer.classList.contains('melodi-progress-error')) {
+    fail('router error: expected .melodi-progress-error class on failure')
+  }
+
+  // 6. Test no-op navigation to same route & dynamic configuration (showSpinner + className)
+  const eventsBeforeNoop = navEvents.length
+  router.push('/fast')
+  if (navEvents.length !== eventsBeforeNoop || router.progress.isActive) {
+    fail('router no-op: navigating to current route should not start a redundant navigation')
+  }
+
+  router.progress.configure({ showSpinner: true, className: 'custom-yt-bar', color: '#00ff88' })
+  router.progress.start()
+  if (!domRouter.window.document.querySelector('.melodi-progress-spinner')) {
+    fail('router progress: expected spinner when showSpinner=true')
+  }
+  if (!progressContainer.classList.contains('custom-yt-bar')) {
+    fail('router progress: expected custom className on container')
+  }
+  router.progress.done()
+
+  // 7. Test browser history hashchange navigation
+  domRouter.window.location.hash = '/about'
+  domRouter.window.dispatchEvent(new domRouter.window.Event('hashchange'))
+  await new Promise(r => setTimeout(r, 15))
+  if (router.currentRoute() !== '/about' || !domRouter.window.document.getElementById('page-about')) {
+    fail('router hashchange: failed to navigate on browser hashchange event')
+  }
+
+  // 8. Test cleanup via router.destroy()
+  router.destroy()
+  if (domRouter.window.document.querySelector('.melodi-progress')) {
+    fail('router destroy: .melodi-progress element should be removed from DOM on destroy()')
+  }
+
+  // 9. Test progress: false option
+  const disabledRouter = new MelodiRouter({
+    routes: [{ path: '/', component: HomeComp }, { path: '/about', component: AboutComp }],
+    progress: false
+  })
+  disabledRouter.progress.start()
+  if (domRouter.window.document.querySelector('.melodi-progress')) {
+    fail('router progress: false should not create progress DOM elements')
+  }
+
   console.log('All tests passed')
   process.exit(0)
 }

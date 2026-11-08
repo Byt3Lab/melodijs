@@ -1,0 +1,608 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MelodiFlix - Streaming SPA (MelodiJS Router & Store)</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+
+<body>
+    <div id="app">
+        <!-- Barre de navigation globale -->
+        <header class="nf-navbar">
+            <div class="nf-nav-left">
+                <div class="nf-logo" id="nav-logo" @click="goHome">MELODIFLIX</div>
+                <nav class="nf-nav-links">
+                    <router-link id="nav-home" to="/">Accueil</router-link>
+                    <router-link id="nav-featured-detail" to="/title/1">Fiche Vedette</router-link>
+                    <router-link id="nav-featured-watch" to="/watch/1">Lecteur Direct</router-link>
+                </nav>
+            </div>
+
+            <div class="nf-nav-right">
+                <span class="nf-badge" id="watchlist-counter">
+                    Ma Liste : {{ $store.state.watchlist.length }}
+                </span>
+                <button class="nf-delay-btn" id="btn-sim-slow" @click="toggleSimulatedLatency">
+                    Latence Nav : {{ $store.state.simulatedDelay }}ms
+                </button>
+                <button class="nf-delay-btn" id="btn-test-error" @click="triggerErrorNav">
+                    Simuler Erreur
+                </button>
+            </div>
+        </header>
+
+        <!-- Vue courante du routeur -->
+        <main class="nf-main">
+            <router-view></router-view>
+        </main>
+
+        <!-- Moniteur temps réel du système Navigation Progress & Lifecycle Events -->
+        <aside class="nf-telemetry" id="telemetry-panel">
+            <div class="nf-telemetry-header">
+                <span>⚡ Navigation Progress Monitor</span>
+                <span id="nav-status-pill" :style="{ color: $store.state.isNavigating ? '#ff4d4d' : '#46d369' }">
+                    {{ $store.state.isNavigating ? 'LOADING...' : 'IDLE' }}
+                </span>
+            </div>
+            <div style="margin-bottom: 6px; color: #aaa;">
+                Route active : <strong id="current-route-label">{{ $router.currentRoute() }}</strong>
+                | Total navs : <strong id="nav-count-label">{{ $store.state.completedNavigations }}</strong>
+            </div>
+            <div class="nf-event-log" id="event-log-list">
+                <div class="nf-event-entry" v-for="(ev, idx) in $store.state.navEvents" :key="ev.uid">
+                    [{{ ev.type }}] {{ ev.from || 'init' }} → {{ ev.to }}
+                </div>
+            </div>
+        </aside>
+    </div>
+
+    <script type="module">
+        import { createApp } from '../../dist/melodijs.js';
+        import { MelodiRouter } from '../../dist/router.js';
+        import { MelodiStore } from '../../dist/store.js';
+
+        const CATALOG = [
+            {
+                id: '1',
+                title: 'Cyber Symphony 2099',
+                genre: 'Sci-Fi • Cyberpunk',
+                year: 2026,
+                rating: '16+',
+                match: '99%',
+                duration: '2h 18m',
+                director: 'Elena Vance',
+                cast: 'Kaelen Voss, Mira Lin, Viktor Sol',
+                bannerGradient: 'linear-gradient(135deg, #3b0a1e 0%, #111827 60%, #090d16 100%)',
+                thumbGradient: 'linear-gradient(135deg, #e50914 0%, #3b0764 100%)',
+                synopsis: 'Dans une mégalopole gouvernée par des algorithmes acoustiques, une compositrice rebelle découvre une fréquence capable de libérer les consciences humaines.',
+                episodes: [
+                    { ep: 1, title: 'Prélude Silencieux', length: '52m' },
+                    { ep: 2, title: 'Résonance Fantôme', length: '49m' },
+                    { ep: 3, title: 'Le Dernier Accord', length: '58m' }
+                ]
+            },
+            {
+                id: '2',
+                title: 'Les Brumes d’Hyperion',
+                genre: 'Thriller • Mystère',
+                year: 2025,
+                rating: '13+',
+                match: '96%',
+                duration: '1h 54m',
+                director: 'Marc-Antoine Delcourt',
+                cast: 'Clara Moreau, Jonas Berg, Sofia Rami',
+                bannerGradient: 'linear-gradient(135deg, #064e3b 0%, #0f172a 70%, #020617 100%)',
+                thumbGradient: 'linear-gradient(135deg, #059669 0%, #1e3a8a 100%)',
+                synopsis: 'Une station océanographique isolée capte un signal provenant d’une fosse abyssale inexplorée, déclenchant une course contre la montre.',
+                episodes: [
+                    { ep: 1, title: 'Pression Zéro', length: '46m' },
+                    { ep: 2, title: 'Écho des Abysses', length: '51m' }
+                ]
+            },
+            {
+                id: '3',
+                title: 'Quantum Drift',
+                genre: 'Action • Adrénaline',
+                year: 2026,
+                rating: '16+',
+                match: '94%',
+                duration: '2h 05m',
+                director: 'Kenji Takahashi',
+                cast: 'Ryu Sato, Hannah Cole, Dante Cruz',
+                bannerGradient: 'linear-gradient(135deg, #7c2d12 0%, #1e1b4b 70%, #09090b 100%)',
+                thumbGradient: 'linear-gradient(135deg, #ea580c 0%, #7c3aed 100%)',
+                synopsis: 'Des pilotes clandestins utilisent des moteurs à saut de phase pour traverser des dimensions parallèles lors de courses urbaines nocturnes.',
+                episodes: [
+                    { ep: 1, title: 'Ligne Rouge', length: '44m' },
+                    { ep: 2, title: 'Singularité', length: '48m' }
+                ]
+            },
+            {
+                id: '4',
+                title: 'Code Melodi : Origines',
+                genre: 'Documentaire • Tech',
+                year: 2026,
+                rating: 'Tout public',
+                match: '98%',
+                duration: '1h 32m',
+                director: 'Sarah Jenkins',
+                cast: 'Équipe Core Web, Architectes UI',
+                bannerGradient: 'linear-gradient(135deg, #1e3a8a 0%, #172554 65%, #090d16 100%)',
+                thumbGradient: 'linear-gradient(135deg, #2563eb 0%, #06b6d4 100%)',
+                synopsis: 'Plongée au cœur de la conception des frameworks réactifs sans Virtual DOM et des architectures web ultra-rapides.',
+                episodes: [
+                    { ep: 1, title: 'La Fin du Virtual DOM', length: '45m' },
+                    { ep: 2, title: 'Signaux Chirurgicaux', length: '47m' }
+                ]
+            }
+        ];
+
+        // --- 1. MelodiStore : État centralisé ---
+        const store = new MelodiStore({
+            state: () => ({
+                catalog: CATALOG,
+                watchlist: ['1'],
+                watchProgress: { '1': 35, '2': 10, '3': 0, '4': 0 },
+                simulatedDelay: 350,
+                failNextNavigation: false,
+                isNavigating: false,
+                completedNavigations: 0,
+                navEvents: []
+            }),
+            actions: {
+                toggleWatchlist(ctx, id) {
+                    const strId = String(id);
+                    const idx = this.state.watchlist.indexOf(strId);
+                    if (idx === -1) {
+                        this.state.watchlist.push(strId);
+                    } else {
+                        this.state.watchlist.splice(idx, 1);
+                    }
+                },
+                updateProgress(ctx, payload) {
+                    const updated = Object.assign({}, this.state.watchProgress);
+                    updated[String(payload.id)] = payload.percent;
+                    this.state.watchProgress = updated;
+                },
+                recordNavEvent(ctx, entry) {
+                    this.state.navEvents.unshift({
+                        uid: Date.now() + '-' + Math.random().toString(36).slice(2, 6),
+                        type: entry.type,
+                        to: entry.to,
+                        from: entry.from
+                    });
+                    if (this.state.navEvents.length > 8) {
+                        this.state.navEvents.pop();
+                    }
+                }
+            }
+        });
+
+        // --- 2. Composants des 3 Pages ---
+
+        // Page 1 : Page d'accueil (/)
+        const HomePage = {
+            data() {
+                return {
+                    searchQuery: ''
+                };
+            },
+            computed: {
+                featured() {
+                    return this.$store.state.catalog[0];
+                },
+                isFeaturedInList() {
+                    return this.$store.state.watchlist.includes('1');
+                },
+                filteredCatalog() {
+                    const q = (this.searchQuery || '').toLowerCase().trim();
+                    if (!q) return this.$store.state.catalog;
+                    return this.$store.state.catalog.filter(item =>
+                        item.title.toLowerCase().includes(q) ||
+                        item.genre.toLowerCase().includes(q)
+                    );
+                },
+                myListItems() {
+                    return this.$store.state.catalog.filter(item =>
+                        this.$store.state.watchlist.includes(item.id)
+                    );
+                }
+            },
+            methods: {
+                openDetail(id) {
+                    this.$router.push('/title/' + id);
+                },
+                openWatch(id) {
+                    this.$router.push('/watch/' + id);
+                },
+                toggleList(id) {
+                    this.$store.dispatch('toggleWatchlist', id);
+                }
+            },
+            template: `
+                <div id="home-page">
+                    <!-- Hero Banner -->
+                    <section class="nf-hero" :style="{ background: featured.bannerGradient }">
+                        <div class="nf-hero-content">
+                            <div class="nf-series-tag">★ SÉRIE ORIGINALE MELODIFLIX</div>
+                            <h1 class="nf-hero-title" id="hero-title">{{ featured.title }}</h1>
+                            <div class="nf-meta-row">
+                                <span class="nf-match">Recommandé à {{ featured.match }}</span>
+                                <span>{{ featured.year }}</span>
+                                <span class="nf-age-box">{{ featured.rating }}</span>
+                                <span>{{ featured.duration }}</span>
+                                <span class="nf-age-box">4K HDR</span>
+                            </div>
+                            <p class="nf-hero-desc">{{ featured.synopsis }}</p>
+                            <div class="nf-btn-row">
+                                <button class="nf-btn nf-btn-play" id="hero-play-btn" @click="openWatch(featured.id)">
+                                    ▶ Lecture
+                                </button>
+                                <button class="nf-btn nf-btn-secondary" id="hero-info-btn" @click="openDetail(featured.id)">
+                                    ℹ Plus d'infos
+                                </button>
+                                <button class="nf-btn nf-btn-red" id="hero-watchlist-btn" @click="toggleList(featured.id)">
+                                    {{ isFeaturedInList ? '✓ Dans Ma Liste' : '+ Ma Liste' }}
+                                </button>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- Catalogue Principal -->
+                    <section class="nf-section">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                            <h2 class="nf-section-title" style="margin-bottom: 0;">🔥 Tendances & Catalogue</h2>
+                            <input
+                                id="catalog-search"
+                                v-model="searchQuery"
+                                placeholder="Rechercher un titre ou genre..."
+                                style="background: #222; border: 1px solid #444; color: #fff; padding: 8px 14px; border-radius: 6px; width: 260px;"
+                            />
+                        </div>
+
+                        <div class="nf-grid">
+                            <div class="nf-card" v-for="item in filteredCatalog" :key="item.id" :id="'card-' + item.id">
+                                <div class="nf-card-thumb" :style="{ background: item.thumbGradient }" @click="openDetail(item.id)">
+                                    <span class="nf-card-genre">{{ item.genre }}</span>
+                                    <span class="nf-card-duration">{{ item.duration }}</span>
+                                </div>
+                                <div class="nf-card-body">
+                                    <div>
+                                        <div class="nf-card-title" @click="openDetail(item.id)">{{ item.title }}</div>
+                                        <div class="nf-card-sub">
+                                            <span class="nf-match">{{ item.match }}</span> • {{ item.year }} • {{ item.rating }}
+                                        </div>
+                                        <div class="nf-card-sub">{{ item.synopsis }}</div>
+                                    </div>
+                                    <div class="nf-card-actions">
+                                        <button class="nf-mini-btn primary" :id="'card-watch-' + item.id" @click="openWatch(item.id)">
+                                            ▶ Regarder
+                                        </button>
+                                        <button class="nf-mini-btn" :id="'card-detail-' + item.id" @click="openDetail(item.id)">
+                                            Détails
+                                        </button>
+                                        <button class="nf-mini-btn" :id="'card-list-' + item.id" @click="toggleList(item.id)">
+                                            + Liste
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- Section Ma Liste -->
+                    <section class="nf-section" v-if="myListItems.length > 0">
+                        <h2 class="nf-section-title">📌 Ma Liste ({{ myListItems.length }})</h2>
+                        <div class="nf-grid">
+                            <div class="nf-card" v-for="fav in myListItems" :key="fav.id">
+                                <div class="nf-card-body">
+                                    <div class="nf-card-title" @click="openDetail(fav.id)">{{ fav.title }}</div>
+                                    <div class="nf-card-sub">{{ fav.genre }} • {{ fav.duration }}</div>
+                                    <div class="nf-card-actions">
+                                        <button class="nf-mini-btn primary" @click="openWatch(fav.id)">▶ Lecture</button>
+                                        <button class="nf-mini-btn" @click="toggleList(fav.id)">Retirer</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+                </div>
+            `
+        };
+
+        // Page 2 : Page détail d'un contenu (/title/:id)
+        const ContentDetailPage = {
+            computed: {
+                contentId() {
+                    return (this.$router.params() && this.$router.params().id) || '1';
+                },
+                item() {
+                    const id = this.contentId;
+                    return this.$store.state.catalog.find(c => c.id === id) || this.$store.state.catalog[0];
+                },
+                inWatchlist() {
+                    return this.$store.state.watchlist.includes(this.item.id);
+                },
+                savedProgress() {
+                    return this.$store.state.watchProgress[this.item.id] || 0;
+                },
+                recommendations() {
+                    return this.$store.state.catalog.filter(c => c.id !== this.item.id);
+                }
+            },
+            methods: {
+                startWatching() {
+                    this.$router.push('/watch/' + this.item.id);
+                },
+                toggleWatchlist() {
+                    this.$store.dispatch('toggleWatchlist', this.item.id);
+                },
+                backHome() {
+                    this.$router.push('/');
+                },
+                switchTitle(id) {
+                    this.$router.push('/title/' + id);
+                }
+            },
+            template: `
+                <div class="nf-detail-container" id="content-detail-page">
+                    <div style="margin-bottom: 16px;">
+                        <button class="nf-btn nf-btn-secondary" id="detail-back-home" @click="backHome">
+                            ← Retour au catalogue
+                        </button>
+                    </div>
+
+                    <div class="nf-detail-banner" :style="{ background: item.bannerGradient }">
+                        <div class="nf-series-tag">FICHE CONTENU OFFICIELLE</div>
+                        <h1 class="nf-hero-title" id="detail-title">{{ item.title }}</h1>
+                        <div class="nf-meta-row">
+                            <span class="nf-match">Compatibilité {{ item.match }}</span>
+                            <span>{{ item.year }}</span>
+                            <span class="nf-age-box">{{ item.rating }}</span>
+                            <span>{{ item.duration }}</span>
+                            <span>{{ item.genre }}</span>
+                        </div>
+                        <p class="nf-hero-desc" id="detail-synopsis">{{ item.synopsis }}</p>
+
+                        <div class="nf-btn-row">
+                            <button class="nf-btn nf-btn-red" id="detail-watch-btn" @click="startWatching">
+                                ▶ Regarder maintenant ({{ savedProgress }}% vu)
+                            </button>
+                            <button class="nf-btn nf-btn-secondary" id="detail-watchlist-btn" @click="toggleWatchlist">
+                                {{ inWatchlist ? '✓ Retirer de Ma Liste' : '+ Ajouter à Ma Liste' }}
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="nf-detail-grid">
+                        <div>
+                            <h3 style="font-size: 1.25rem; margin-bottom: 8px;">Épisodes & Chapitres</h3>
+                            <div class="nf-episode-list">
+                                <div class="nf-episode-item" v-for="ep in item.episodes" :key="ep.ep" @click="startWatching">
+                                    <div>
+                                        <strong>Épisode {{ ep.ep }} — {{ ep.title }}</strong>
+                                        <div style="color: #999; font-size: 0.82rem; margin-top: 3px;">Disponible en 4K Ultra HD & Audio Spatial</div>
+                                    </div>
+                                    <span class="nf-badge">▶ {{ ep.length }}</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div style="background: #1a1a1a; padding: 20px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.08);">
+                            <h3 style="font-size: 1.15rem; margin-bottom: 12px;">Informations techniques</h3>
+                            <p style="margin-bottom: 10px; color: #ccc;"><strong>Réalisation :</strong> {{ item.director }}</p>
+                            <p style="margin-bottom: 10px; color: #ccc;"><strong>Distribution :</strong> {{ item.cast }}</p>
+                            <p style="margin-bottom: 10px; color: #ccc;"><strong>Genre :</strong> {{ item.genre }}</p>
+                            <p style="color: #ccc;"><strong>Progression enregistrée :</strong> {{ savedProgress }}%</p>
+                        </div>
+                    </div>
+
+                    <!-- Titres similaires -->
+                    <h3 style="font-size: 1.25rem; margin-bottom: 14px;">Titres similaires</h3>
+                    <div class="nf-grid">
+                        <div class="nf-card" v-for="rec in recommendations" :key="rec.id">
+                            <div class="nf-card-body">
+                                <div class="nf-card-title" :id="'rec-title-' + rec.id" @click="switchTitle(rec.id)">
+                                    {{ rec.title }}
+                                </div>
+                                <div class="nf-card-sub">{{ rec.genre }} • {{ rec.duration }}</div>
+                                <button class="nf-mini-btn" :id="'rec-btn-' + rec.id" @click="switchTitle(rec.id)">
+                                    Voir la fiche →
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `
+        };
+
+        // Page 3 : Page de visionnage / Lecteur (/watch/:id)
+        const WatchPlayerPage = {
+            data() {
+                return {
+                    isPlaying: true,
+                    currentEpisode: 1,
+                    progressPercent: 35
+                };
+            },
+            computed: {
+                contentId() {
+                    return (this.$router.params() && this.$router.params().id) || '1';
+                },
+                item() {
+                    const id = this.contentId;
+                    return this.$store.state.catalog.find(c => c.id === id) || this.$store.state.catalog[0];
+                }
+            },
+            mounted() {
+                const existing = this.$store.state.watchProgress[this.contentId];
+                if (typeof existing === 'number' && existing > 0) {
+                    this.progressPercent = existing;
+                }
+            },
+            methods: {
+                togglePlay() {
+                    this.isPlaying = !this.isPlaying;
+                },
+                advanceTimeline() {
+                    const nextVal = Math.min(100, this.progressPercent + 15);
+                    this.progressPercent = nextVal;
+                    this.$store.dispatch('updateProgress', { id: this.contentId, percent: nextVal });
+                },
+                backToDetail() {
+                    this.$router.push('/title/' + this.item.id);
+                },
+                backToHome() {
+                    this.$router.push('/');
+                }
+            },
+            template: `
+                <div class="nf-player-page" id="watch-player-page">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                        <div style="display: flex; gap: 10px;">
+                            <button class="nf-btn nf-btn-secondary" id="player-back-detail" @click="backToDetail">
+                                ← Retour à la fiche
+                            </button>
+                            <button class="nf-btn nf-btn-secondary" id="player-back-home" @click="backToHome">
+                                Accueil
+                            </button>
+                        </div>
+                        <div>
+                            <span class="nf-badge">En lecture : <strong id="player-title">{{ item.title }}</strong> (Ép. {{ currentEpisode }})</span>
+                        </div>
+                    </div>
+
+                    <div class="nf-video-stage" :style="{ background: item.bannerGradient }">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <span class="nf-series-tag">● FLUX ULTRA HD 4K ACTIF</span>
+                            <span class="nf-badge" id="player-state-badge">{{ isPlaying ? 'LECTURE EN COURS' : 'EN PAUSE' }}</span>
+                        </div>
+
+                        <div class="nf-video-center">
+                            <div class="nf-pulse-circle" id="player-toggle-btn" @click="togglePlay">
+                                {{ isPlaying ? '❚❚' : '▶' }}
+                            </div>
+                            <h2 style="font-size: 1.8rem; margin-bottom: 6px;">{{ item.title }}</h2>
+                            <p style="color: #ccc;">{{ item.genre }} — Progression : <strong id="player-progress-value">{{ progressPercent }}%</strong></p>
+                        </div>
+
+                        <div class="nf-player-controls">
+                            <div class="nf-scrubber" id="player-scrubber" @click="advanceTimeline">
+                                <div class="nf-scrubber-fill" :style="{ width: progressPercent + '%' }"></div>
+                            </div>
+                            <div class="nf-control-bar">
+                                <div style="display: flex; gap: 10px;">
+                                    <button class="nf-mini-btn primary" id="btn-play-pause" @click="togglePlay">
+                                        {{ isPlaying ? 'Pause' : 'Lecture' }}
+                                    </button>
+                                    <button class="nf-mini-btn" id="btn-advance-15" @click="advanceTimeline">
+                                        +15% Timeline
+                                    </button>
+                                </div>
+                                <div style="color: #bbb; font-size: 0.85rem;">
+                                    Audio : Français (Dolby Atmos) • Sous-titres : Activés
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `
+        };
+
+        // --- 3. Configuration de MelodiRouter avec Navigation Progress ---
+        const router = new MelodiRouter({
+            routes: [
+                { path: '/', component: HomePage, transition: 'fade' },
+                {
+                    path: '/title/:id',
+                    // Chargement asynchrone pour démontrer la progression fluide de la barre
+                    component: () => new Promise(resolve => {
+                        setTimeout(() => resolve(ContentDetailPage), 120);
+                    }),
+                    transition: 'fade'
+                },
+                {
+                    path: '/watch/:id',
+                    component: () => new Promise(resolve => {
+                        setTimeout(() => resolve(WatchPlayerPage), 120);
+                    }),
+                    transition: 'fade'
+                }
+            ],
+            progress: {
+                enabled: true,
+                color: '#e50914',       // Rouge Netflix / YouTube
+                errorColor: '#f59e0b',  // Orange vif en cas d'erreur simulée
+                height: '3px',
+                speed: 180,
+                trickleSpeed: 80,
+                showSpinner: false
+            }
+        });
+
+        // Garde de navigation simulant le préchargement réseau et le test d'erreur
+        router.beforeEach((to, from, next) => {
+            if (store.state.failNextNavigation) {
+                store.state.failNextNavigation = false;
+                throw new Error('Erreur réseau simulée lors du chargement de ' + to);
+            }
+            const delay = (!from ? 0 : store.state.simulatedDelay) || 0;
+            if (delay > 0) {
+                setTimeout(() => next(), delay);
+            } else {
+                next();
+            }
+        });
+
+        // Écouteurs des événements de cycle de vie de navigation
+        router.on('navigation:start', (e) => {
+            store.state.isNavigating = true;
+            store.dispatch('recordNavEvent', { type: 'START', to: e.to, from: e.from });
+        });
+
+        router.on('navigation:complete', (e) => {
+            store.state.isNavigating = false;
+            store.state.completedNavigations++;
+            store.dispatch('recordNavEvent', { type: 'COMPLETE', to: e.to, from: e.from });
+        });
+
+        router.on('navigation:cancelled', (e) => {
+            store.state.isNavigating = false;
+            store.dispatch('recordNavEvent', { type: 'CANCEL (' + e.reason + ')', to: e.to, from: e.from });
+        });
+
+        router.on('navigation:error', (e) => {
+            store.state.isNavigating = false;
+            store.dispatch('recordNavEvent', { type: 'ERROR', to: e.to, from: e.from });
+        });
+
+        // --- 4. Création et montage de l'application racine ---
+        const app = createApp({
+            data() {
+                return {};
+            },
+            methods: {
+                goHome() {
+                    this.$router.push('/');
+                },
+                toggleSimulatedLatency() {
+                    const current = this.$store.state.simulatedDelay;
+                    this.$store.state.simulatedDelay = current === 350 ? 900 : (current === 900 ? 50 : 350);
+                },
+                triggerErrorNav() {
+                    this.$store.state.failNextNavigation = true;
+                    this.$router.push('/title/999');
+                }
+            }
+        });
+
+        app.use(store);
+        app.use(router);
+        app.mount('#app');
+    </script>
+</body>
+
+</html>

@@ -645,6 +645,10 @@ export class Component {
         this._signals = {};
         if (!this.reactivity) return state; // Should not happen
         for (const key of Object.keys(obj)) {
+            if (key === '$router' || key === '$store') {
+                state[key] = obj[key];
+                continue;
+            }
             const initialValue = obj[key];
             const [getter, setter] = this.reactivity.createSignal(initialValue);
 
@@ -724,6 +728,18 @@ export class Component {
 
     _makeDeepReactive(val: any, notify: () => void): any {
         if (val === null || typeof val !== 'object') return val;
+        if (
+            (val as any).__melodi_raw ||
+            typeof (val as any).nodeType === 'number' ||
+            val instanceof WeakMap ||
+            val instanceof Map ||
+            val instanceof Set ||
+            val instanceof Promise ||
+            val instanceof Date ||
+            val instanceof RegExp
+        ) {
+            return val;
+        }
 
         const mutatingMethods = ['push', 'pop', 'shift', 'unshift', 'splice', 'sort', 'reverse'];
         const self = this;

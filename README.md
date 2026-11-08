@@ -146,7 +146,7 @@ createApp({
 
 ### Router
 
-Built-in SPA router with dynamic routes, nested routes, and navigation guards:
+Built-in SPA router with dynamic routes, nested routes, lazy-loaded components, navigation guards, lifecycle events, and a YouTube-inspired top progress bar:
 
 ```javascript
 import { MelodiRouter } from 'melodijs/router';
@@ -155,6 +155,7 @@ const router = new MelodiRouter({
   routes: [
     { path: '/', component: Home },
     { path: '/user/:id', component: User },
+    { path: '/reports', component: () => import('./Reports.js') },
     {
       path: '/admin',
       component: Admin,
@@ -163,15 +164,27 @@ const router = new MelodiRouter({
         { path: 'settings', component: AdminSettings }
       ]
     }
-  ]
+  ],
+  // Built-in YouTube-style Navigation Progress (enabled by default, or pass `progress: false`)
+  progress: {
+    color: '#ff0000',
+    height: '2px',
+    speed: 200,
+    showSpinner: false
+  }
 });
 
 router.beforeEach((to, from, next) => {
   if (to === '/admin' && !isAuthenticated()) {
-    next('/login');
+    next('/login'); // or next(false) to cancel navigation
   } else {
     next();
   }
+});
+
+// Navigation lifecycle events ('navigation:start' | 'navigation:complete' | 'navigation:cancelled' | 'navigation:error')
+router.on('navigation:complete', ({ to, from }) => {
+  console.log(`Navigated from ${from} to ${to}`);
 });
 
 app.use(router);

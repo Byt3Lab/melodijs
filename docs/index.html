@@ -846,6 +846,62 @@ this.$router.params()  // => { id: '123' }
 
 // Query parameters
 this.$router.query()  // => { tab: 'profile' }</code></pre>
+
+        <h3>Navigation Progress (YouTube-style)</h3>
+        <p><code>MelodiRouter</code> includes a built-in, zero-dependency top navigation progress bar inspired by YouTube. It automatically activates during programmatic navigation, <code>&lt;router-link&gt;</code> clicks, browser history changes, asynchronous navigation guards, and dynamic component loading.</p>
+        <pre><code>const router = new MelodiRouter({
+  routes: [
+    { path: '/', component: Home },
+    // Supports async / lazy-loaded route components natively
+    { path: '/dashboard', component: () => import('./Dashboard.js') }
+  ],
+  // Customize or pass `progress: false` to disable
+  progress: {
+    enabled: true,        // Default: true
+    color: '#ff0000',     // Bar & glow color (Default: '#ff0000')
+    errorColor: '#ef4444',// Color when navigation fails (Default: '#ef4444')
+    height: '2px',        // Bar thickness (Default: '2px')
+    speed: 200,           // Animation transition speed in ms (Default: 200)
+    trickleSpeed: 200,    // Automatic trickle interval in ms (Default: 200)
+    minimum: 0.08,        // Initial percentage (Default: 0.08)
+    showSpinner: false,   // Optional top-right spinner (Default: false)
+    zIndex: 99999,        // Top overlay z-index (Default: 99999)
+    className: ''         // Optional custom CSS class
+  }
+});</code></pre>
+
+        <h4>Manual Progress Control</h4>
+        <p>You can also control the progress bar manually from any component or service via <code>router.progress</code> (or <code>this.$router.progress</code>):</p>
+        <pre><code>this.$router.progress.start();                 // Start the progress bar
+this.$router.progress.set(0.5);                // Set to 50%
+this.$router.progress.inc();                   // Trickle forward
+this.$router.progress.done();                  // Complete (100%) and fade out
+this.$router.progress.fail();                  // Flash error color and fade out
+this.$router.progress.configure({ color: '#3b82f6', height: '3px' });</code></pre>
+
+        <h3>Navigation Lifecycle Events</h3>
+        <p>Subscribe to navigation lifecycle events for monitoring, analytics, or custom page transitions:</p>
+        <pre><code>// Subscribe to lifecycle events (returns an unsubscribe function)
+const offStart = router.on('navigation:start', ({ to, from, navigationId }) => {
+  console.log(`Starting navigation #${navigationId}: ${from} -> ${to}`);
+});
+
+router.on('navigation:complete', ({ to, from }) => {
+  console.log(`Navigation completed: ${to}`);
+});
+
+router.on('navigation:cancelled', ({ to, reason }) => {
+  console.log(`Navigation to ${to} cancelled (${reason})`); // 'guard' or 'superseded'
+});
+
+router.on('navigation:error', ({ to, error }) => {
+  console.error(`Navigation to ${to} failed:`, error);
+});
+
+// Vue Router-like afterEach hook
+router.afterEach((to, from) => {
+  document.title = `My App - ${to}`;
+});</code></pre>
       </section>
 
       <section id="transitions">

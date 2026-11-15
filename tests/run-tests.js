@@ -661,6 +661,211 @@ async function run(){
     fail('router progress: false should not create progress DOM elements')
   }
 
+  // 10. Test router base option (Normalization, History mode, push/replace, guards, router-link, popstate)
+  // 10.A Normalization tests
+  const r1 = new MelodiRouter({ routes: [], base: '/admin/base/settings/' })
+  if (r1.base !== '/admin/base/settings') fail(`router base normalization: expected '/admin/base/settings', got '${r1.base}'`)
+
+  const r2 = new MelodiRouter({ routes: [], base: 'admin/base/settings' })
+  if (r2.base !== '/admin/base/settings') fail(`router base normalization: expected '/admin/base/settings', got '${r2.base}'`)
+
+  const r3 = new MelodiRouter({ routes: [], base: '/' })
+  if (r3.base !== '') fail(`router base normalization: expected '', got '${r3.base}'`)
+
+  const r4 = new MelodiRouter({ routes: [], base: '///' })
+  if (r4.base !== '') fail(`router base normalization: expected '', got '${r4.base}'`)
+
+  const r5 = new MelodiRouter({ routes: [], base: undefined })
+  if (r5.base !== '') fail(`router base normalization: expected '', got '${r5.base}'`)
+
+  const r6 = new MelodiRouter({ routes: [], base: '  /admin/test/  ' })
+  if (r6.base !== '/admin/test') fail(`router base normalization: expected '/admin/test', got '${r6.base}'`)
+
+  // 10.B History mode with base in full DOM environment
+  const domHistory = new JSDOM(
+    `<!doctype html><html><head></head><body>
+      <div id="history-app">
+        <nav>
+          <router-link id="link-curr" to="/currencies">Currencies</router-link>
+          <router-link id="link-gen" to="/general">General</router-link>
+          <router-link id="link-rel" to="profile">Profile Rel</router-link>
+        </nav>
+        <router-view></router-view>
+      </div>
+    </body></html>`,
+    {
+      url: 'http://localhost/admin/base/settings/currencies',
+      runScripts: 'outside-only'
+    }
+  )
+
+  global.window = domHistory.window
+  global.document = domHistory.window.document
+  global.HTMLElement = domHistory.window.HTMLElement
+
+  const { createApp: createHistoryApp } = await import(modPath)
+
+  const CurrenciesComp = {
+    template: '<div id="page-currencies"><h1>Currencies Page</h1></div>'
+  }
+  const GeneralComp = {
+    template: '<div id="page-general"><h1>General Settings</h1></div>'
+  }
+  const RootSettingsComp = {
+    template: '<div id="page-root"><h1>Root Settings</h1></div>'
+  }
+  const ProfileComp = {
+    template: '<div id="page-profile"><h1>Profile Page</h1></div>'
+  }
+
+  const guardCalls = []
+  const historyRouter = new MelodiRouter({
+    mode: 'history',
+    base: '/admin/base/settings/',
+    routes: [
+      { path: '/', component: RootSettingsComp },
+      { path: '/currencies', component: CurrenciesComp },
+      { path: '/general', component: GeneralComp },
+      { path: '/profile', component: ProfileComp }
+    ],
+    progress: false
+  })
+
+  historyRouter.beforeEach((to, from, next) => {
+    guardCalls.push({ to, from })
+    next()
+  })
+
+  const historyApp = createHistoryApp({
+    template: '<div><slot></slot></div>'
+  })
+  historyApp.use(historyRouter)
+  await historyApp.mount('#history-app')
+  await new Promise(r => setTimeout(r, 20))
+
+  // 10.C Initial resolution under base path
+  if (historyRouter.currentRoute() !== '/currencies') {
+    fail(`router base initial route: expected '/currencies', got '${historyRouter.currentRoute()}'`)
+  }
+  if (!domHistory.window.document.getElementById('page-currencies')) {
+    fail('router base initial route: CurrenciesComp not rendered in DOM')
+  }
+
+  // 10.D Check <router-link> href rendering with base
+  const linkCurr = domHistory.window.document.querySelector('#link-curr a')
+  const linkGen = domHistory.window.document.querySelector('#link-gen a')
+  const linkRel = domHistory.window.document.querySelector('#link-rel a')
+
+  if (!linkCurr || linkCurr.getAttribute('href') !== '/admin/base/settings/currencies') {
+    fail(`router-link base href: expected '/admin/base/settings/currencies', got '${linkCurr?.getAttribute('href')}'`)
+  }
+  if (!linkGen || linkGen.getAttribute('href') !== '/admin/base/settings/general') {
+    fail(`router-link base href: expected '/admin/base/settings/general', got '${linkGen?.getAttribute('href')}'`)
+  }
+  if (!linkRel || linkRel.getAttribute('href') !== '/admin/base/settings/profile') {
+    fail(`router-link relative base href: expected '/admin/base/settings/profile', got '${linkRel?.getAttribute('href')}'`)
+  }
+
+  // 10.E Click navigation via <router-link>
+  linkGen.dispatchEvent(new domHistory.window.MouseEvent('click', { bubbles: true, cancelable: true }))
+  await new Promise(r => setTimeout(r, 20))
+
+  if (historyRouter.currentRoute() !== '/general') {
+    fail(`router base link click: expected currentRoute '/general', got '${historyRouter.currentRoute()}'`)
+  }
+  if (!domHistory.window.document.getElementById('page-general')) {
+    fail('router base link click: GeneralComp not rendered in DOM')
+  }
+  if (domHistory.window.location.pathname !== '/admin/base/settings/general') {
+    fail(`router base browser pathname: expected '/admin/base/settings/general', got '${domHistory.window.location.pathname}'`)
+  }
+
+  // 10.F Programmatic navigation push and replace
+  historyRouter.push('/currencies')
+  await new Promise(r => setTimeout(r, 20))
+
+  if (historyRouter.currentRoute() !== '/currencies') {
+    fail(`router base push: expected '/currencies', got '${historyRouter.currentRoute()}'`)
+  }
+  if (domHistory.window.location.pathname !== '/admin/base/settings/currencies') {
+    fail(`router base push pathname: expected '/admin/base/settings/currencies', got '${domHistory.window.location.pathname}'`)
+  }
+
+  historyRouter.replace('/profile')
+  await new Promise(r => setTimeout(r, 20))
+
+  if (historyRouter.currentRoute() !== '/profile') {
+    fail(`router base replace: expected '/profile', got '${historyRouter.currentRoute()}'`)
+  }
+  if (domHistory.window.location.pathname !== '/admin/base/settings/profile') {
+    fail(`router base replace pathname: expected '/admin/base/settings/profile', got '${domHistory.window.location.pathname}'`)
+  }
+
+  // Verify guard received internal paths
+  const lastGuard = guardCalls[guardCalls.length - 1]
+  if (lastGuard.to !== '/profile' || lastGuard.from !== '/currencies') {
+    fail(`router base guard paths: expected to='/profile' from='/currencies', got to='${lastGuard.to}' from='${lastGuard.from}'`)
+  }
+
+  // 10.G Popstate event handling under base
+  domHistory.window.history.pushState({}, '', '/admin/base/settings/general')
+  domHistory.window.dispatchEvent(new domHistory.window.Event('popstate'))
+  await new Promise(r => setTimeout(r, 20))
+
+  if (historyRouter.currentRoute() !== '/general') {
+    fail(`router base popstate: expected '/general', got '${historyRouter.currentRoute()}'`)
+  }
+  if (!domHistory.window.document.getElementById('page-general')) {
+    fail('router base popstate: GeneralComp not mounted on popstate')
+  }
+
+  // 10.H Exact base path navigation resolves to root '/'
+  historyRouter.push('/')
+  await new Promise(r => setTimeout(r, 20))
+  if (historyRouter.currentRoute() !== '/') {
+    fail(`router base root: expected '/', got '${historyRouter.currentRoute()}'`)
+  }
+  if (domHistory.window.location.pathname !== '/admin/base/settings/') {
+    fail(`router base root pathname: expected '/admin/base/settings/', got '${domHistory.window.location.pathname}'`)
+  }
+  if (!domHistory.window.document.getElementById('page-root')) {
+    fail('router base root: RootSettingsComp not mounted')
+  }
+
+  // 10.I Initial load on exact base path without trailing slash
+  const domBaseRoot = new JSDOM(
+    `<!doctype html><html><head></head><body><div id="base-root-app"><router-view></router-view></div></body></html>`,
+    {
+      url: 'http://localhost/admin/base/settings',
+      runScripts: 'outside-only'
+    }
+  )
+  global.window = domBaseRoot.window
+  global.document = domBaseRoot.window.document
+  global.HTMLElement = domBaseRoot.window.HTMLElement
+
+  const routerBaseRoot = new MelodiRouter({
+    mode: 'history',
+    base: '/admin/base/settings',
+    routes: [{ path: '/', component: RootSettingsComp }],
+    progress: false
+  })
+
+  const appBaseRoot = createHistoryApp({ template: '<div><slot></slot></div>' })
+  appBaseRoot.use(routerBaseRoot)
+  await appBaseRoot.mount('#base-root-app')
+  await new Promise(r => setTimeout(r, 20))
+
+  if (routerBaseRoot.currentRoute() !== '/') {
+    fail(`router base without trailing slash: expected route '/', got '${routerBaseRoot.currentRoute()}'`)
+  }
+  if (!domBaseRoot.window.document.getElementById('page-root')) {
+    fail('router base without trailing slash: RootSettingsComp not rendered')
+  }
+  routerBaseRoot.destroy()
+
+  historyRouter.destroy()
+
   console.log('All tests passed')
   process.exit(0)
 }

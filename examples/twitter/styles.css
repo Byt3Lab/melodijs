@@ -1,0 +1,681 @@
+:root {
+    --x-bg: #000000;
+    --x-surface: #16181c;
+    --x-surface-hover: #1d1f23;
+    --x-border: #2f3336;
+    --x-text-main: #e7e9ea;
+    --x-text-muted: #71767b;
+    --x-primary: #1d9bf0;
+    --x-primary-hover: #1a8cd8;
+    --x-primary-light: rgba(29, 155, 240, 0.1);
+    --x-like: #f91880;
+    --x-like-light: rgba(249, 24, 128, 0.1);
+    --x-retweet: #00ba7c;
+    --x-retweet-light: rgba(0, 186, 124, 0.1);
+    --x-danger: #f4212e;
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    background-color: var(--x-bg);
+    color: var(--x-text-main);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    font-size: 15px;
+    line-height: 1.4;
+    overflow-y: scroll;
+}
+
+a {
+    color: inherit;
+    text-decoration: none;
+}
+
+button {
+    font-family: inherit;
+    border: none;
+    background: none;
+    cursor: pointer;
+}
+
+/* Base App Layout */
+.x-layout {
+    display: flex;
+    justify-content: center;
+    min-height: 100vh;
+    max-width: 1280px;
+    margin: 0 auto;
+}
+
+/* Left Sidebar Navigation */
+.x-sidebar-left {
+    width: 260px;
+    padding: 12px 16px 20px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    height: 100vh;
+    position: sticky;
+    top: 0;
+    border-right: 1px solid var(--x-border);
+}
+
+.x-logo-container {
+    padding: 8px 12px;
+    display: inline-flex;
+    align-items: center;
+    border-radius: 9999px;
+    transition: background-color 0.2s;
+    width: fit-content;
+    margin-bottom: 8px;
+    cursor: pointer;
+}
+
+.x-logo-container:hover {
+    background-color: var(--x-surface-hover);
+}
+
+.x-nav-menu {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.x-nav-item a,
+.x-nav-item .x-nav-link {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 12px 16px;
+    border-radius: 9999px;
+    font-size: 1.25rem;
+    font-weight: 500;
+    color: var(--x-text-main);
+    transition: background-color 0.2s, color 0.2s;
+    text-decoration: none;
+    width: fit-content;
+}
+
+.x-nav-item:hover a,
+.x-nav-item:hover .x-nav-link {
+    background-color: var(--x-surface-hover);
+}
+
+.x-nav-item.active a,
+.x-nav-item.active .x-nav-link {
+    font-weight: 800;
+}
+
+.x-nav-icon {
+    font-size: 1.5rem;
+    width: 28px;
+    display: flex;
+    justify-content: center;
+}
+
+.x-badge {
+    background-color: var(--x-primary);
+    color: #fff;
+    font-size: 0.75rem;
+    font-weight: 700;
+    border-radius: 9999px;
+    padding: 2px 7px;
+    margin-left: -8px;
+}
+
+.x-btn-tweet-large {
+    background-color: var(--x-primary);
+    color: #ffffff;
+    font-weight: 700;
+    font-size: 1.05rem;
+    padding: 14px 24px;
+    border-radius: 9999px;
+    margin-top: 16px;
+    text-align: center;
+    transition: background-color 0.2s;
+    box-shadow: 0 4px 12px rgba(29, 155, 240, 0.25);
+    width: 100%;
+}
+
+.x-btn-tweet-large:hover {
+    background-color: var(--x-primary-hover);
+}
+
+/* User Account Profile Pill */
+.x-user-pill {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 12px;
+    border-radius: 9999px;
+    transition: background-color 0.2s;
+    cursor: pointer;
+}
+
+.x-user-pill:hover {
+    background-color: var(--x-surface-hover);
+}
+
+.x-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    object-fit: cover;
+    background-color: var(--x-border);
+}
+
+.x-avatar-lg {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    border: 4px solid var(--x-bg);
+}
+
+.x-user-info {
+    flex: 1;
+    overflow: hidden;
+    line-height: 1.25;
+}
+
+.x-user-name {
+    font-weight: 700;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.x-user-handle {
+    font-size: 0.85rem;
+    color: var(--x-text-muted);
+}
+
+/* Center Feed / Timeline */
+.x-main {
+    flex: 1;
+    max-width: 620px;
+    min-height: 100vh;
+    border-right: 1px solid var(--x-border);
+}
+
+.x-header-sticky {
+    position: sticky;
+    top: 0;
+    background-color: rgba(0, 0, 0, 0.75);
+    backdrop-filter: blur(12px);
+    z-index: 100;
+    border-bottom: 1px solid var(--x-border);
+}
+
+.x-header-title {
+    padding: 14px 16px;
+    font-size: 1.25rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.x-feed-tabs {
+    display: flex;
+    border-bottom: 1px solid var(--x-border);
+}
+
+.x-feed-tab {
+    flex: 1;
+    text-align: center;
+    padding: 14px 0;
+    color: var(--x-text-muted);
+    font-weight: 600;
+    cursor: pointer;
+    position: relative;
+    transition: background-color 0.2s, color 0.2s;
+}
+
+.x-feed-tab:hover {
+    background-color: var(--x-surface-hover);
+}
+
+.x-feed-tab.active {
+    color: var(--x-text-main);
+    font-weight: 700;
+}
+
+.x-feed-tab.active::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 56px;
+    height: 4px;
+    background-color: var(--x-primary);
+    border-radius: 9999px;
+}
+
+/* Tweet Box Composer */
+.x-compose-box {
+    display: flex;
+    gap: 12px;
+    padding: 16px;
+    border-bottom: 1px solid var(--x-border);
+}
+
+.x-compose-main {
+    flex: 1;
+}
+
+.x-compose-input {
+    width: 100%;
+    background: transparent;
+    border: none;
+    outline: none;
+    color: var(--x-text-main);
+    font-size: 1.25rem;
+    font-family: inherit;
+    resize: none;
+    min-height: 70px;
+}
+
+.x-compose-actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-top: 12px;
+    border-top: 1px solid var(--x-border);
+}
+
+.x-compose-tools {
+    display: flex;
+    gap: 8px;
+    color: var(--x-primary);
+    font-size: 1.15rem;
+}
+
+.x-tool-btn {
+    width: 34px;
+    height: 34px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.x-tool-btn:hover {
+    background-color: var(--x-primary-light);
+}
+
+.x-compose-submit-wrap {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.x-char-counter {
+    font-size: 0.85rem;
+    color: var(--x-text-muted);
+}
+
+.x-char-counter.warning {
+    color: #eab308;
+}
+
+.x-char-counter.danger {
+    color: var(--x-danger);
+}
+
+.x-btn-tweet-small {
+    background-color: var(--x-primary);
+    color: #fff;
+    font-weight: 700;
+    padding: 8px 18px;
+    border-radius: 9999px;
+    font-size: 0.95rem;
+    transition: opacity 0.2s, background-color 0.2s;
+}
+
+.x-btn-tweet-small:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.x-btn-tweet-small:not(:disabled):hover {
+    background-color: var(--x-primary-hover);
+}
+
+/* Tweet Item Card */
+.x-tweet {
+    display: flex;
+    gap: 12px;
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--x-border);
+    transition: background-color 0.2s;
+    cursor: pointer;
+}
+
+.x-tweet:hover {
+    background-color: rgba(255, 255, 255, 0.02);
+}
+
+.x-tweet-content {
+    flex: 1;
+    overflow: hidden;
+}
+
+.x-tweet-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.95rem;
+    margin-bottom: 4px;
+}
+
+.x-tweet-author {
+    font-weight: 700;
+}
+
+.x-tweet-handle,
+.x-tweet-time {
+    color: var(--x-text-muted);
+    font-size: 0.9rem;
+}
+
+.x-tweet-body {
+    font-size: 0.95rem;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    word-break: break-word;
+    margin-bottom: 10px;
+}
+
+.x-tweet-tag {
+    color: var(--x-primary);
+}
+
+.x-tweet-media {
+    border-radius: 16px;
+    overflow: hidden;
+    margin-bottom: 10px;
+    border: 1px solid var(--x-border);
+    max-height: 340px;
+}
+
+.x-tweet-media img {
+    width: 100%;
+    height: auto;
+    display: block;
+    object-fit: cover;
+}
+
+.x-tweet-actions {
+    display: flex;
+    justify-content: space-between;
+    max-width: 440px;
+    color: var(--x-text-muted);
+    font-size: 0.85rem;
+}
+
+.x-action-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--x-text-muted);
+    transition: color 0.2s;
+}
+
+.x-action-icon {
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    transition: background-color 0.2s, color 0.2s;
+}
+
+.x-action-btn:hover .x-action-icon {
+    background-color: var(--x-primary-light);
+    color: var(--x-primary);
+}
+.x-action-btn:hover {
+    color: var(--x-primary);
+}
+
+.x-action-btn.repost:hover .x-action-icon {
+    background-color: var(--x-retweet-light);
+    color: var(--x-retweet);
+}
+.x-action-btn.repost:hover,
+.x-action-btn.reposted {
+    color: var(--x-retweet) !important;
+}
+
+.x-action-btn.like:hover .x-action-icon {
+    background-color: var(--x-like-light);
+    color: var(--x-like);
+}
+.x-action-btn.like:hover,
+.x-action-btn.liked {
+    color: var(--x-like) !important;
+}
+
+/* Right Sidebar (Trends & Info) */
+.x-sidebar-right {
+    width: 350px;
+    padding: 12px 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    height: 100vh;
+    position: sticky;
+    top: 0;
+}
+
+.x-search-box {
+    position: sticky;
+    top: 12px;
+    z-index: 10;
+    background-color: var(--x-surface);
+    border-radius: 9999px;
+    display: flex;
+    align-items: center;
+    padding: 10px 16px;
+    gap: 12px;
+    border: 1px solid transparent;
+    transition: border-color 0.2s, background-color 0.2s;
+}
+
+.x-search-box:focus-within {
+    background-color: var(--x-bg);
+    border-color: var(--x-primary);
+}
+
+.x-search-input {
+    background: transparent;
+    border: none;
+    outline: none;
+    color: var(--x-text-main);
+    width: 100%;
+    font-size: 0.95rem;
+}
+
+/* Widget Container */
+.x-widget {
+    background-color: var(--x-surface);
+    border-radius: 16px;
+    overflow: hidden;
+    border: 1px solid var(--x-border);
+}
+
+.x-widget-header {
+    padding: 14px 16px;
+    font-size: 1.15rem;
+    font-weight: 800;
+}
+
+.x-trend-item {
+    padding: 12px 16px;
+    transition: background-color 0.2s;
+    cursor: pointer;
+    line-height: 1.35;
+}
+
+.x-trend-item:hover {
+    background-color: var(--x-surface-hover);
+}
+
+.x-trend-category {
+    font-size: 0.8rem;
+    color: var(--x-text-muted);
+}
+
+.x-trend-name {
+    font-weight: 700;
+    font-size: 0.95rem;
+}
+
+.x-trend-tweets {
+    font-size: 0.8rem;
+    color: var(--x-text-muted);
+}
+
+/* Who to Follow Item */
+.x-follow-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    transition: background-color 0.2s;
+}
+
+.x-follow-item:hover {
+    background-color: var(--x-surface-hover);
+}
+
+.x-btn-follow {
+    background-color: #ffffff;
+    color: #000000;
+    font-weight: 700;
+    padding: 6px 16px;
+    border-radius: 9999px;
+    font-size: 0.85rem;
+    transition: opacity 0.2s;
+}
+
+.x-btn-follow.following {
+    background-color: transparent;
+    color: var(--x-text-main);
+    border: 1px solid var(--x-border);
+}
+
+.x-btn-follow:hover {
+    opacity: 0.9;
+}
+
+/* Routeur Base Path Inspector Card */
+.x-router-card {
+    background: linear-gradient(135deg, rgba(29, 155, 240, 0.08), rgba(0, 186, 124, 0.08));
+    border: 1px solid rgba(29, 155, 240, 0.3);
+    border-radius: 16px;
+    padding: 14px 16px;
+    font-size: 0.85rem;
+}
+
+.x-router-badge {
+    display: inline-block;
+    background-color: var(--x-primary);
+    color: #fff;
+    font-weight: 700;
+    font-size: 0.75rem;
+    padding: 2px 8px;
+    border-radius: 6px;
+    margin-bottom: 8px;
+}
+
+.x-router-row {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 6px;
+    gap: 8px;
+}
+
+.x-router-val {
+    font-family: monospace;
+    font-weight: 700;
+    color: var(--x-primary);
+    word-break: break-all;
+}
+
+/* Profile View Specifics */
+.x-profile-banner {
+    height: 150px;
+    background: linear-gradient(120deg, #1d9bf0, #00ba7c);
+    position: relative;
+}
+
+.x-profile-details {
+    padding: 16px;
+    position: relative;
+}
+
+.x-profile-avatar-wrap {
+    position: absolute;
+    top: -45px;
+    left: 16px;
+}
+
+.x-profile-action-bar {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: 12px;
+}
+
+.x-profile-bio {
+    margin: 12px 0;
+    line-height: 1.45;
+}
+
+.x-profile-meta {
+    display: flex;
+    gap: 16px;
+    color: var(--x-text-muted);
+    font-size: 0.9rem;
+    margin-bottom: 12px;
+}
+
+.x-profile-stats {
+    display: flex;
+    gap: 20px;
+    font-size: 0.9rem;
+}
+
+.x-profile-stats span {
+    font-weight: 700;
+    color: var(--x-text-main);
+}
+
+/* Transitions de Route MelodiRouter */
+.router-view-container {
+    position: relative;
+    width: 100%;
+}
+
+.route-wrapper {
+    width: 100%;
+    background-color: var(--x-bg);
+}
+
+.fade-enter-active,
+.fade-leave-active {
+    transition: opacity 0.15s ease-out;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+    opacity: 0;
+}

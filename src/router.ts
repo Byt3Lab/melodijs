@@ -40,6 +40,7 @@ export type ScrollBehaviorHandler = (
 export interface RouterOptions {
     routes: RouteDef[];
     mode?: 'hash' | 'history';  // Default: 'hash'
+    base?: string;              // Ex: '/admin/base/settings'
     progress?: boolean | ProgressOptions; // Default: true
     scrollBehavior?: boolean | 'top' | ScrollBehaviorHandler; // Default: 'top'
 }
@@ -396,6 +397,7 @@ export class NavigationProgress {
 export class MelodiRouter implements Plugin {
     routes: RouteDef[];
     mode: 'hash' | 'history';
+    base: string;
     progress: NavigationProgress;
     scrollBehavior: boolean | 'top' | ScrollBehaviorHandler;
     currentRoute: any; // Signal
@@ -424,6 +426,7 @@ export class MelodiRouter implements Plugin {
     constructor(options: RouterOptions) {
         this.routes = options.routes || [];
         this.mode = options.mode || 'hash';  // Default to hash mode
+        this.base = this._normalizeBase(options.base);
         this.progress = new NavigationProgress(options.progress);
         this.scrollBehavior = options.scrollBehavior !== undefined ? options.scrollBehavior : 'top';
         this.currentRoute = null;
@@ -434,6 +437,13 @@ export class MelodiRouter implements Plugin {
         this.setQuery = null;
         this.matched = null;
         this.setMatched = null;
+    }
+
+    private _normalizeBase(base?: string): string {
+        if (!base) return '';
+        let b = base.trim().replace(/\/+$/, '');
+        if (!b) return '';
+        return b.startsWith('/') ? b : '/' + b;
     }
 
     beforeEach(hook: NavigationBeforeGuard): void {
@@ -553,7 +563,17 @@ export class MelodiRouter implements Plugin {
 
     _getCurrentPath(): string {
         if (this.mode === 'history') {
-            return window.location.pathname || '/';
+            const pathname = (typeof window !== 'undefined' && window.location && window.location.pathname) || '/';
+            if (this.base) {
+                if (pathname === this.base) {
+                    return '/';
+                }
+                if (pathname.startsWith(this.base + '/')) {
+                    const sliced = pathname.slice(this.base.length);
+                    return sliced.startsWith('/') ? sliced : '/' + sliced;
+                }
+            }
+            return pathname || '/';
         }
         const hash = window.location.hash.slice(1);
         return hash.split('?')[0] || '/';
@@ -610,10 +630,12 @@ export class MelodiRouter implements Plugin {
         if (historyAction === 'pop' || typeof window === 'undefined') return;
 
         if (this.mode === 'history') {
+            const targetPath = rawUrl.startsWith('/') ? rawUrl : '/' + rawUrl;
+            const fullUrl = (this.base || '') + targetPath;
             if (historyAction === 'replace') {
-                window.history.replaceState({}, '', rawUrl);
+                window.history.replaceState({}, '', fullUrl);
             } else {
-                window.history.pushState({}, '', rawUrl);
+                window.history.pushState({}, '', fullUrl);
             }
         } else {
             const targetHash = '#' + (rawUrl.startsWith('/') ? rawUrl : '/' + rawUrl);
@@ -1001,7 +1023,9 @@ export class MelodiRouter implements Plugin {
             computed: {
                 href() {
                     if (router.mode === 'history') {
-                        return (this as any).to;
+                        const rawTo = (this as any).to || '';
+                        const toPath = rawTo.startsWith('/') ? rawTo : '/' + rawTo;
+                        return (router.base || '') + toPath;
                     }
                     return '#' + (this as any).to;
                 }

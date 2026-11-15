@@ -1,0 +1,819 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>X (Twitter Clone) — MelodiJS Router avec support Base Path</title>
+    <link rel="stylesheet" href="/examples/twitter/styles.css">
+</head>
+
+<body>
+    <div id="app">
+        <div class="x-layout">
+            <!-- Barre de navigation latérale gauche -->
+            <aside class="x-sidebar-left">
+                <div>
+                    <!-- Logo X -->
+                    <div class="x-logo-container" @click="goHome">
+                        <svg viewBox="0 0 24 24" aria-hidden="true" style="width: 30px; height: 30px; fill: #fff;">
+                            <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"></path>
+                        </svg>
+                    </div>
+
+                    <!-- Menu de navigation utilisant <router-link> et l'option base -->
+                    <nav class="x-nav-menu">
+                        <div class="x-nav-item" :class="{ active: $router.currentRoute() === '/' }">
+                            <router-link to="/" class="x-nav-link">
+                                <span class="x-nav-icon">🏠</span>
+                                <span>Accueil</span>
+                            </router-link>
+                        </div>
+                        <div class="x-nav-item" :class="{ active: $router.currentRoute() === '/explore' }">
+                            <router-link to="/explore" class="x-nav-link">
+                                <span class="x-nav-icon">🔍</span>
+                                <span>Explorer</span>
+                            </router-link>
+                        </div>
+                        <div class="x-nav-item" :class="{ active: $router.currentRoute() === '/notifications' }">
+                            <router-link to="/notifications" class="x-nav-link">
+                                <span class="x-nav-icon">🔔</span>
+                                <span>Notifications</span>
+                                <span class="x-badge" v-if="$store.state.unreadNotifications > 0">{{ $store.state.unreadNotifications }}</span>
+                            </router-link>
+                        </div>
+                        <div class="x-nav-item" :class="{ active: $router.currentRoute() === '/bookmarks' }">
+                            <router-link to="/bookmarks" class="x-nav-link">
+                                <span class="x-nav-icon">🔖</span>
+                                <span>Signets</span>
+                                <span class="x-badge" v-if="bookmarkedCount > 0">{{ bookmarkedCount }}</span>
+                            </router-link>
+                        </div>
+                        <div class="x-nav-item" :class="{ active: $router.currentRoute() === '/profile' }">
+                            <router-link to="/profile" class="x-nav-link">
+                                <span class="x-nav-icon">👤</span>
+                                <span>Profil</span>
+                            </router-link>
+                        </div>
+                    </nav>
+
+                    <button class="x-btn-tweet-large" @click="focusComposer">
+                        Poster
+                    </button>
+                </div>
+
+                <!-- Profil utilisateur en bas de la barre latérale -->
+                <div class="x-user-pill" @click="goProfile">
+                    <img :src="$store.state.currentUser.avatar" class="x-avatar" alt="Avatar" />
+                    <div class="x-user-info">
+                        <div class="x-user-name">{{ $store.state.currentUser.name }}</div>
+                        <div class="x-user-handle">{{ $store.state.currentUser.handle }}</div>
+                    </div>
+                    <span style="color: var(--x-text-muted); font-size: 1.1rem;">···</span>
+                </div>
+            </aside>
+
+            <!-- Colonne centrale principale rendue par le Routeur -->
+            <main class="x-main">
+                <router-view></router-view>
+            </main>
+
+            <!-- Barre latérale droite (Recherche, Tendances, Diagnostic Base Path) -->
+            <aside class="x-sidebar-right">
+                <!-- Boîte de recherche -->
+                <div class="x-search-box">
+                    <span style="color: var(--x-text-muted);">🔍</span>
+                    <input
+                        type="text"
+                        class="x-search-input"
+                        placeholder="Chercher sur X..."
+                        v-model="$store.state.searchQuery"
+                    />
+                </div>
+
+                <!-- Diagnostic interactif du support Base Path -->
+                <div class="x-router-card">
+                    <div class="x-router-badge">⚡ MELODIROUTER • BASE PATH</div>
+                    <div class="x-router-row">
+                        <span>Mode Routeur :</span>
+                        <span class="x-router-val">{{ $router.mode }}</span>
+                    </div>
+                    <div class="x-router-row">
+                        <span>Base configurée :</span>
+                        <span class="x-router-val">{{ $router.base || '(racine /)' }}</span>
+                    </div>
+                    <div class="x-router-row">
+                        <span>Route interne :</span>
+                        <span class="x-router-val">{{ $router.currentRoute() }}</span>
+                    </div>
+                    <div class="x-router-row">
+                        <span>URL Navigateur :</span>
+                        <span class="x-router-val" id="browser-url-display">{{ browserUrl }}</span>
+                    </div>
+                    <div style="font-size: 0.78rem; color: var(--x-text-muted); margin-top: 8px; border-top: 1px dashed rgba(255,255,255,0.1); padding-top: 6px;">
+                        💡 Les balises <code>&lt;router-link to="/explore"&gt;</code> écrivent <code>{{ ($router.base || '') + '/explore' }}</code> sans recharger la page.
+                    </div>
+                </div>
+
+                <!-- Widget Tendances -->
+                <div class="x-widget">
+                    <div class="x-widget-header">Tendances pour vous</div>
+                    <div
+                        class="x-trend-item"
+                        v-for="trend in $store.state.trends"
+                        :key="trend.id"
+                        @click="searchTrend(trend.tag)"
+                    >
+                        <div class="x-trend-category">{{ trend.category }} · Tendances</div>
+                        <div class="x-trend-name">{{ trend.tag }}</div>
+                        <div class="x-trend-tweets">{{ trend.tweets }} posts</div>
+                    </div>
+                </div>
+
+                <!-- Widget Suggestions d'abonnements -->
+                <div class="x-widget">
+                    <div class="x-widget-header">Qui suivre</div>
+                    <div
+                        class="x-follow-item"
+                        v-for="user in $store.state.suggestions"
+                        :key="user.id"
+                    >
+                        <div style="display: flex; gap: 10px; align-items: center;">
+                            <img :src="user.avatar" class="x-avatar" alt="Avatar" />
+                            <div>
+                                <div style="font-weight: 700; font-size: 0.95rem;">{{ user.name }}</div>
+                                <div style="color: var(--x-text-muted); font-size: 0.85rem;">{{ user.handle }}</div>
+                            </div>
+                        </div>
+                        <button
+                            class="x-btn-follow"
+                            :class="{ following: user.following }"
+                            @click="toggleFollow(user.id)"
+                        >
+                            {{ user.following ? 'Abonné' : 'Suivre' }}
+                        </button>
+                    </div>
+                </div>
+            </aside>
+        </div>
+    </div>
+
+    <!-- Application Script ES Module -->
+    <script type="module">
+        import { createApp } from '/dist/melodijs.js';
+        import { MelodiRouter } from '/dist/router.js';
+        import { MelodiStore } from '/dist/store.js';
+
+        // --- Détection intelligente du Base Path d'exécution ---
+        // Si servi sous /twitter/ ou sous /examples/twitter/, on adapte la base pour une démo fonctionnelle directe
+        let autoBase = '/twitter';
+        if (typeof window !== 'undefined' && window.location && window.location.pathname) {
+            const path = window.location.pathname;
+            if (path.includes('/examples/twitter')) {
+                autoBase = path.replace(/\/examples\/twitter(\/.*)?$/, '/examples/twitter');
+            } else if (path.includes('/twitter')) {
+                autoBase = path.replace(/\/twitter(\/.*)?$/, '/twitter');
+            }
+        }
+
+        // --- 1. MelodiStore (Gestion d'état réactive) ---
+        const store = new MelodiStore({
+            state: () => ({
+                currentUser: {
+                    name: 'Gaëtan Gomsu',
+                    handle: '@gaetangomsu',
+                    bio: 'Architecte Logiciel & Créateur de MelodiJS. 🚀 Reactivité chirurgicale sans Virtual DOM. #TypeScript #OpenSource',
+                    joined: 'Rejoint en Mars 2024',
+                    followingCount: 142,
+                    followersCount: '12.4K',
+                    avatar: 'https://ui-avatars.com/api/?name=Gaetan+Gomsu&background=1d9bf0&color=fff&size=128'
+                },
+                searchQuery: '',
+                unreadNotifications: 3,
+                trends: [
+                    { id: 1, category: 'Technologie', tag: '#MelodiJS', tweets: '45.2K' },
+                    { id: 2, category: 'JavaScript', tag: '#NoVirtualDOM', tweets: '28.1K' },
+                    { id: 3, category: 'Développement Web', tag: '#TypeScript', tweets: '84.6K' },
+                    { id: 4, category: 'France', tag: 'SPA Router', tweets: '12.9K' }
+                ],
+                suggestions: [
+                    { id: 1, name: 'SolidJS', handle: '@solid_js', following: false, avatar: 'https://ui-avatars.com/api/?name=Solid+JS&background=4f88c6&color=fff' },
+                    { id: 2, name: 'Evan You', handle: '@youyuxi', following: true, avatar: 'https://ui-avatars.com/api/?name=Evan+You&background=42b883&color=fff' },
+                    { id: 3, name: 'TypeScript Team', handle: '@typescript', following: false, avatar: 'https://ui-avatars.com/api/?name=TypeScript&background=3178c6&color=fff' }
+                ],
+                notifications: [
+                    { id: 1, type: 'like', text: 'Evan You a aimé votre post sur MelodiRouter', time: 'Il y a 10m', icon: '❤️' },
+                    { id: 2, type: 'repost', text: 'SolidJS a republié votre post sur la réactivité fine', time: 'Il y a 1h', icon: '🔁' },
+                    { id: 3, type: 'follow', text: 'TypeScript Team a commencé à vous suivre', time: 'Il y a 3h', icon: '👤' }
+                ],
+                tweets: [
+                    {
+                        id: 101,
+                        author: 'Gaëtan Gomsu',
+                        handle: '@gaetangomsu',
+                        avatar: 'https://ui-avatars.com/api/?name=Gaetan+Gomsu&background=1d9bf0&color=fff',
+                        time: '1h',
+                        content: 'Fier d\'annoncer le support de l\'option "base" pour MelodiRouter ! 🎉\n\nVous pouvez désormais monter vos SPA sur n\'importe quel sous-chemin racine (ex: /twitter, /admin/base/settings) de manière 100% transparente en mode History et Hash. #MelodiJS #WebDev',
+                        image: 'https://images.unsplash.com/photo-1555066931-4365d14bab8c?w=700&auto=format&fit=crop&q=80',
+                        likes: 128,
+                        reposts: 34,
+                        replies: 19,
+                        liked: true,
+                        reposted: false,
+                        bookmarked: true
+                    },
+                    {
+                        id: 102,
+                        author: 'TypeScript Team',
+                        handle: '@typescript',
+                        avatar: 'https://ui-avatars.com/api/?name=TypeScript&background=3178c6&color=fff',
+                        time: '3h',
+                        content: 'Une architecture avec typage strict de bout en bout et zéro fuite mémoire. Les performances de rendu de MelodiJS sans Virtual DOM sont impressionnantes. Bravo pour ce travail !',
+                        image: '',
+                        likes: 312,
+                        reposts: 89,
+                        replies: 42,
+                        liked: false,
+                        reposted: true,
+                        bookmarked: false
+                    },
+                    {
+                        id: 103,
+                        author: 'Frontend Mastery',
+                        handle: '@frontendmastery',
+                        avatar: 'https://ui-avatars.com/api/?name=Frontend+Mastery&background=ea580c&color=fff',
+                        time: '6h',
+                        content: 'Comment fonctionne le mode History avec un Base Path ?\n\n1. Le routeur tronque le préfixe à la lecture.\n2. L\'historique (pushState) réinjecte le préfixe.\n3. Les liens <router-link> génèrent le bon href.\n\nUne expérience fluide pour l\'utilisateur et le serveur !',
+                        image: 'https://images.unsplash.com/photo-1507238691740-187a5b1d37b8?w=700&auto=format&fit=crop&q=80',
+                        likes: 85,
+                        reposts: 14,
+                        replies: 8,
+                        liked: false,
+                        reposted: false,
+                        bookmarked: false
+                    }
+                ]
+            }),
+            mutations: {
+                ADD_TWEET(state, content) {
+                    if (!content || !content.trim()) return;
+                    state.tweets.unshift({
+                        id: Date.now(),
+                        author: state.currentUser.name,
+                        handle: state.currentUser.handle,
+                        avatar: state.currentUser.avatar,
+                        time: 'À l\'instant',
+                        content: content.trim(),
+                        image: '',
+                        likes: 0,
+                        reposts: 0,
+                        replies: 0,
+                        liked: false,
+                        reposted: false,
+                        bookmarked: false
+                    });
+                },
+                TOGGLE_LIKE(state, tweetId) {
+                    const tweet = state.tweets.find(t => t.id === tweetId);
+                    if (tweet) {
+                        tweet.liked = !tweet.liked;
+                        tweet.likes += tweet.liked ? 1 : -1;
+                    }
+                },
+                TOGGLE_REPOST(state, tweetId) {
+                    const tweet = state.tweets.find(t => t.id === tweetId);
+                    if (tweet) {
+                        tweet.reposted = !tweet.reposted;
+                        tweet.reposts += tweet.reposted ? 1 : -1;
+                    }
+                },
+                TOGGLE_BOOKMARK(state, tweetId) {
+                    const tweet = state.tweets.find(t => t.id === tweetId);
+                    if (tweet) {
+                        tweet.bookmarked = !tweet.bookmarked;
+                    }
+                },
+                TOGGLE_FOLLOW(state, userId) {
+                    const user = state.suggestions.find(u => u.id === userId);
+                    if (user) {
+                        user.following = !user.following;
+                    }
+                }
+            }
+        });
+
+        // --- 2. Définitions des Pages / Composants de Route ---
+
+        // A. Page Accueil (Timeline + Compositeur)
+        const HomePage = {
+            data() {
+                return {
+                    newTweetText: '',
+                    activeTab: 'forYou'
+                };
+            },
+            computed: {
+                charRemaining() {
+                    return 280 - (this.newTweetText ? this.newTweetText.length : 0);
+                },
+                canPost() {
+                    const len = this.newTweetText ? this.newTweetText.trim().length : 0;
+                    return len > 0 && len <= 280;
+                },
+                filteredTweets() {
+                    const query = this.$store.state.searchQuery ? this.$store.state.searchQuery.toLowerCase() : '';
+                    if (!query) return this.$store.state.tweets;
+                    return this.$store.state.tweets.filter(t =>
+                        t.content.toLowerCase().includes(query) ||
+                        t.author.toLowerCase().includes(query) ||
+                        t.handle.toLowerCase().includes(query)
+                    );
+                }
+            },
+            methods: {
+                submitTweet() {
+                    if (!this.canPost) return;
+                    this.$store.commit('ADD_TWEET', this.newTweetText);
+                    this.newTweetText = '';
+                },
+                likeTweet(id) {
+                    this.$store.commit('TOGGLE_LIKE', id);
+                },
+                repostTweet(id) {
+                    this.$store.commit('TOGGLE_REPOST', id);
+                },
+                bookmarkTweet(id) {
+                    this.$store.commit('TOGGLE_BOOKMARK', id);
+                }
+            },
+            template: `
+                <div>
+                    <div class="x-header-sticky">
+                        <div class="x-header-title">
+                            <span>Accueil</span>
+                            <span style="font-size: 1.1rem; cursor: pointer;">✨</span>
+                        </div>
+                        <div class="x-feed-tabs">
+                            <div
+                                class="x-feed-tab"
+                                :class="{ active: activeTab === 'forYou' }"
+                                @click="activeTab = 'forYou'"
+                            >
+                                Pour vous
+                            </div>
+                            <div
+                                class="x-feed-tab"
+                                :class="{ active: activeTab === 'following' }"
+                                @click="activeTab = 'following'"
+                            >
+                                Abonnements
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Boîte de composition de Tweet -->
+                    <div class="x-compose-box">
+                        <img :src="$store.state.currentUser.avatar" class="x-avatar" alt="Avatar" />
+                        <div class="x-compose-main">
+                            <textarea
+                                id="tweet-composer-input"
+                                class="x-compose-input"
+                                placeholder="Quoi de neuf ?!"
+                                v-model="newTweetText"
+                            ></textarea>
+                            <div class="x-compose-actions">
+                                <div class="x-compose-tools">
+                                    <div class="x-tool-btn" title="Image">🖼️</div>
+                                    <div class="x-tool-btn" title="GIF">👾</div>
+                                    <div class="x-tool-btn" title="Sondage">📊</div>
+                                    <div class="x-tool-btn" title="Emoji">😀</div>
+                                </div>
+                                <div class="x-compose-submit-wrap">
+                                    <span
+                                        class="x-char-counter"
+                                        :class="{ warning: charRemaining <= 20, danger: charRemaining < 0 }"
+                                    >
+                                        {{ charRemaining }}
+                                    </span>
+                                    <button
+                                        class="x-btn-tweet-small"
+                                        :disabled="!canPost"
+                                        @click="submitTweet"
+                                    >
+                                        Poster
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Liste des Tweets -->
+                    <div class="x-tweets-stream">
+                        <div
+                            class="x-tweet"
+                            v-for="tweet in filteredTweets"
+                            :key="tweet.id"
+                        >
+                            <img :src="tweet.avatar" class="x-avatar" alt="Avatar" />
+                            <div class="x-tweet-content">
+                                <div class="x-tweet-header">
+                                    <span class="x-tweet-author">{{ tweet.author }}</span>
+                                    <span class="x-tweet-handle">{{ tweet.handle }}</span>
+                                    <span class="x-tweet-time">· {{ tweet.time }}</span>
+                                </div>
+                                <div class="x-tweet-body">{{ tweet.content }}</div>
+                                <div class="x-tweet-media" v-if="tweet.image">
+                                    <img :src="tweet.image" alt="Média Tweet" />
+                                </div>
+                                <div class="x-tweet-actions">
+                                    <button class="x-action-btn reply" title="Répondre">
+                                        <div class="x-action-icon">💬</div>
+                                        <span>{{ tweet.replies }}</span>
+                                    </button>
+                                    <button
+                                        class="x-action-btn repost"
+                                        :class="{ reposted: tweet.reposted }"
+                                        @click="repostTweet(tweet.id)"
+                                        title="Republier"
+                                    >
+                                        <div class="x-action-icon">🔁</div>
+                                        <span>{{ tweet.reposts }}</span>
+                                    </button>
+                                    <button
+                                        class="x-action-btn like"
+                                        :class="{ liked: tweet.liked }"
+                                        @click="likeTweet(tweet.id)"
+                                        title="J'aime"
+                                    >
+                                        <div class="x-action-icon">{{ tweet.liked ? '❤️' : '🤍' }}</div>
+                                        <span>{{ tweet.likes }}</span>
+                                    </button>
+                                    <button
+                                        class="x-action-btn bookmark"
+                                        @click="bookmarkTweet(tweet.id)"
+                                        title="Signet"
+                                    >
+                                        <div class="x-action-icon">{{ tweet.bookmarked ? '🔖' : '📑' }}</div>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `
+        };
+
+        // B. Page Explorer
+        const ExplorePage = {
+            template: `
+                <div>
+                    <div class="x-header-sticky">
+                        <div class="x-header-title">
+                            <span>Explorer</span>
+                            <span style="font-size: 1.1rem; cursor: pointer;">⚙️</span>
+                        </div>
+                    </div>
+                    <div style="padding: 16px;">
+                        <h2 style="font-size: 1.25rem; font-weight: 800; margin-bottom: 16px;">Tendances du moment</h2>
+                        <div class="x-widget" style="margin-bottom: 24px;">
+                            <div
+                                class="x-trend-item"
+                                v-for="trend in $store.state.trends"
+                                :key="trend.id"
+                            >
+                                <div class="x-trend-category">{{ trend.category }} · Populaire</div>
+                                <div class="x-trend-name">{{ trend.tag }}</div>
+                                <div class="x-trend-tweets">{{ trend.tweets }} posts</div>
+                            </div>
+                        </div>
+
+                        <div class="x-widget">
+                            <div class="x-widget-header">À ne pas manquer</div>
+                            <div style="padding: 16px; font-size: 0.95rem; line-height: 1.6;">
+                                <p style="font-weight: 700; color: var(--x-primary); margin-bottom: 6px;">
+                                    🚀 MelodiJS v0.1.0 & MelodiRouter
+                                </p>
+                                <p style="color: var(--x-text-muted);">
+                                    Le support natif de l'option <code>base</code> résout l'intégration des SPA sur des sous-dossiers Nginx, GitHub Pages, et micro-frontends sans hacks ni redirections complexes.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `
+        };
+
+        // C. Page Notifications
+        const NotificationsPage = {
+            methods: {
+                openNotif(id) {
+                    this.$router.push('/notifications/' + id);
+                }
+            },
+            template: `
+                <div>
+                    <div class="x-header-sticky">
+                        <div class="x-header-title">
+                            <span>Notifications</span>
+                            <span style="font-size: 1.1rem; cursor: pointer;">⚙️</span>
+                        </div>
+                    </div>
+                    <div>
+                        <div
+                            class="x-tweet"
+                            v-for="notif in $store.state.notifications"
+                            :key="notif.id"
+                            style="align-items: center; cursor: pointer;"
+                            @click="openNotif(notif.id)"
+                        >
+                            <span style="font-size: 1.5rem; width: 40px; text-align: center;">{{ notif.icon }}</span>
+                            <div style="flex: 1;">
+                                <div style="font-size: 0.95rem;">{{ notif.text }}</div>
+                                <div style="color: var(--x-text-muted); font-size: 0.8rem; margin-top: 4px;">{{ notif.time }}</div>
+                            </div>
+                            <span style="color: var(--x-text-muted); font-size: 0.85rem;">Détail ➔</span>
+                        </div>
+                    </div>
+                </div>
+            `
+        };
+
+        // C2. Page Détail d'une Notification avec paramètre dynamique :id
+        const NotificationDetailPage = {
+            computed: {
+                notifId() {
+                    const params = this.$router.params ? this.$router.params() : {};
+                    return params.id || '';
+                },
+                notification() {
+                    const id = Number(this.notifId);
+                    return this.$store.state.notifications.find(n => n.id === id) || {
+                        id: this.notifId,
+                        icon: '🔔',
+                        text: 'Notification spécifique #' + this.notifId,
+                        time: 'Récemment'
+                    };
+                }
+            },
+            methods: {
+                goBack() {
+                    this.$router.push('/notifications');
+                }
+            },
+            template: `
+                <div>
+                    <div class="x-header-sticky">
+                        <div class="x-header-title" style="gap: 16px;">
+                            <button @click="goBack" style="font-size: 1.2rem; color: #fff;">←</button>
+                            <div>
+                                <div>Détail Notification</div>
+                                <div style="font-size: 0.8rem; color: var(--x-text-muted); font-weight: normal;">
+                                    ID : {{ notifId }} (route : /notifications/:id)
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div style="padding: 24px;">
+                        <div class="x-widget" style="padding: 20px;">
+                            <div style="display: flex; gap: 16px; align-items: center; margin-bottom: 16px;">
+                                <span style="font-size: 2.5rem;">{{ notification.icon }}</span>
+                                <div>
+                                    <div style="font-size: 1.15rem; font-weight: 700;">{{ notification.text }}</div>
+                                    <div style="color: var(--x-text-muted); font-size: 0.85rem; margin-top: 4px;">Reçue {{ notification.time }}</div>
+                                </div>
+                            </div>
+                            <div style="border-top: 1px solid var(--x-border); padding-top: 14px; font-size: 0.9rem; line-height: 1.6; color: var(--x-text-muted);">
+                                <p>✅ <strong>Prise en charge de la route dynamique avec Base Path :</strong></p>
+                                <p style="margin-top: 6px;">
+                                    L'URL navigateur est <code>{{ ($router.base || '') + '/notifications/' + notifId }}</code>.<br>
+                                    Le routeur a extrait le paramètre <code>id = "{{ notifId }}"</code> via <code>this.$router.params().id</code>.
+                                </p>
+                            </div>
+                            <button
+                                class="x-btn-tweet-small"
+                                style="margin-top: 16px;"
+                                @click="goBack"
+                            >
+                                Retour aux notifications
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `
+        };
+
+        // D. Page Signets (Bookmarks)
+        const BookmarksPage = {
+            computed: {
+                bookmarkedTweets() {
+                    return this.$store.state.tweets.filter(t => t.bookmarked);
+                }
+            },
+            methods: {
+                removeBookmark(id) {
+                    this.$store.commit('TOGGLE_BOOKMARK', id);
+                }
+            },
+            template: `
+                <div>
+                    <div class="x-header-sticky">
+                        <div class="x-header-title">
+                            <div>
+                                <div>Signets</div>
+                                <div style="font-size: 0.8rem; color: var(--x-text-muted); font-weight: normal;">
+                                    @{{ $store.state.currentUser.handle }}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div v-if="bookmarkedTweets.length === 0" style="padding: 40px 20px; text-align: center; color: var(--x-text-muted);">
+                        <div style="font-size: 2.5rem; margin-bottom: 12px;">📑</div>
+                        <div style="font-size: 1.25rem; font-weight: 700; color: var(--x-text-main); margin-bottom: 8px;">
+                            Enregistrez des posts pour plus tard
+                        </div>
+                        <div>Ne laissez pas s'échapper les bons tweets ! Enregistrez-les ici.</div>
+                    </div>
+
+                    <div class="x-tweets-stream" v-else>
+                        <div
+                            class="x-tweet"
+                            v-for="tweet in bookmarkedTweets"
+                            :key="tweet.id"
+                        >
+                            <img :src="tweet.avatar" class="x-avatar" alt="Avatar" />
+                            <div class="x-tweet-content">
+                                <div class="x-tweet-header">
+                                    <span class="x-tweet-author">{{ tweet.author }}</span>
+                                    <span class="x-tweet-handle">{{ tweet.handle }}</span>
+                                </div>
+                                <div class="x-tweet-body">{{ tweet.content }}</div>
+                                <button
+                                    style="color: var(--x-danger); font-size: 0.85rem; margin-top: 6px;"
+                                    @click="removeBookmark(tweet.id)"
+                                >
+                                    Retirer des signets ❌
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `
+        };
+
+        // E. Page Profil
+        const ProfilePage = {
+            computed: {
+                myTweets() {
+                    return this.$store.state.tweets.filter(t => t.handle === this.$store.state.currentUser.handle);
+                }
+            },
+            template: `
+                <div>
+                    <div class="x-header-sticky">
+                        <div class="x-header-title">
+                            <div>
+                                <div>{{ $store.state.currentUser.name }}</div>
+                                <div style="font-size: 0.8rem; color: var(--x-text-muted); font-weight: normal;">
+                                    {{ myTweets.length }} posts
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="x-profile-banner"></div>
+                    <div class="x-profile-details">
+                        <div class="x-profile-avatar-wrap">
+                            <img :src="$store.state.currentUser.avatar" class="x-avatar-lg" alt="Avatar" />
+                        </div>
+                        <div class="x-profile-action-bar">
+                            <button
+                                style="border: 1px solid var(--x-border); color: #fff; padding: 8px 18px; border-radius: 9999px; font-weight: 700;"
+                            >
+                                Éditer le profil
+                            </button>
+                        </div>
+                        <div style="margin-top: 10px;">
+                            <h1 style="font-size: 1.35rem; font-weight: 800;">{{ $store.state.currentUser.name }}</h1>
+                            <div style="color: var(--x-text-muted); font-size: 0.9rem;">{{ $store.state.currentUser.handle }}</div>
+                        </div>
+                        <div class="x-profile-bio">{{ $store.state.currentUser.bio }}</div>
+                        <div class="x-profile-meta">
+                            <span>📅 {{ $store.state.currentUser.joined }}</span>
+                        </div>
+                        <div class="x-profile-stats">
+                            <div><span>{{ $store.state.currentUser.followingCount }}</span> <span style="color: var(--x-text-muted); font-weight: normal;">abonnements</span></div>
+                            <div><span>{{ $store.state.currentUser.followersCount }}</span> <span style="color: var(--x-text-muted); font-weight: normal;">abonnés</span></div>
+                        </div>
+                    </div>
+
+                    <div class="x-feed-tabs" style="margin-top: 8px;">
+                        <div class="x-feed-tab active">Posts ({{ myTweets.length }})</div>
+                        <div class="x-feed-tab">Réponses</div>
+                        <div class="x-feed-tab">Médias</div>
+                        <div class="x-feed-tab">J'aime</div>
+                    </div>
+
+                    <div class="x-tweets-stream">
+                        <div class="x-tweet" v-for="t in myTweets" :key="t.id">
+                            <img :src="t.avatar" class="x-avatar" alt="Avatar" />
+                            <div class="x-tweet-content">
+                                <div class="x-tweet-header">
+                                    <span class="x-tweet-author">{{ t.author }}</span>
+                                    <span class="x-tweet-handle">{{ t.handle }}</span>
+                                    <span class="x-tweet-time">· {{ t.time }}</span>
+                                </div>
+                                <div class="x-tweet-body">{{ t.content }}</div>
+                                <div class="x-tweet-media" v-if="t.image">
+                                    <img :src="t.image" alt="Média" />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `
+        };
+
+        // --- 3. Instanciation de MelodiRouter avec l'option "base" ---
+        const router = new MelodiRouter({
+            mode: 'history',
+            base: autoBase, // Définit le Base Path (ex: '/twitter' ou sous-chemin actif)
+            routes: [
+                { path: '/', component: HomePage, transition: 'fade' },
+                { path: '/explore', component: ExplorePage, transition: 'fade' },
+                { path: '/notifications', component: NotificationsPage, transition: 'fade' },
+                { path: '/notifications/:id', component: NotificationDetailPage, transition: 'fade' },
+                { path: '/bookmarks', component: BookmarksPage, transition: 'fade' },
+                { path: '/profile', component: ProfilePage, transition: 'fade' }
+            ],
+            progress: {
+                enabled: true,
+                color: '#1d9bf0', // Bleu officiel Twitter / X
+                height: '3px',
+                speed: 180,
+                trickleSpeed: 80
+            }
+        });
+
+        // --- 4. Application Racine MelodiJS ---
+        const app = createApp({
+            data() {
+                return {
+                    browserUrl: typeof window !== 'undefined' ? window.location.pathname : ''
+                };
+            },
+            computed: {
+                bookmarkedCount() {
+                    return this.$store.state.tweets.filter(t => t.bookmarked).length;
+                }
+            },
+            methods: {
+                goHome() {
+                    this.$router.push('/');
+                    this.updateBrowserUrl();
+                },
+                goProfile() {
+                    this.$router.push('/profile');
+                    this.updateBrowserUrl();
+                },
+                searchTrend(tag) {
+                    this.$store.state.searchQuery = tag;
+                    this.$router.push('/');
+                    this.updateBrowserUrl();
+                },
+                toggleFollow(userId) {
+                    this.$store.commit('TOGGLE_FOLLOW', userId);
+                },
+                focusComposer() {
+                    this.$router.push('/');
+                    this.updateBrowserUrl();
+                    setTimeout(() => {
+                        const el = document.getElementById('tweet-composer-input');
+                        if (el) el.focus();
+                    }, 50);
+                },
+                updateBrowserUrl() {
+                    if (typeof window !== 'undefined') {
+                        this.browserUrl = window.location.pathname;
+                    }
+                }
+            },
+            hooks: {
+                mounted() {
+                    this.updateBrowserUrl();
+                    if (typeof window !== 'undefined') {
+                        window.addEventListener('popstate', () => {
+                            this.updateBrowserUrl();
+                        });
+                    }
+                }
+            }
+        });
+
+        app.use(store);
+        app.use(router);
+        app.mount('#app');
+    </script>
+</body>
+
+</html>
